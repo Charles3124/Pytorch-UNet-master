@@ -1,0 +1,13 @@
+.idea/
+.github/
+venv/
+__pycache__/
+
+data/
+checkpoints/
+wandb/
+good_model/
+
+*.pyc
+*.pth
+*.jpg
