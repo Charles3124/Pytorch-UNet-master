@@ -27,9 +27,8 @@ from npz_preprocess import RandomGenerator
 os.environ["KMP_DUPLICATE_LIB_OK"] = "True"
 logging.basicConfig(level=logging.INFO, format="%(levelname)s: %(message)s")
 
-base_dir = Path("D:/unet_data/dataset_split/npzgood")
-list_dir = Path("D:/unet_data/dataset_split/dataset_split")
-dir_checkpoint = Path("./checkpoints/")
+BASE_DIR = Path("D:/unet_data/dataset_split/npzgood")
+LIST_DIR = Path("D:/unet_data/dataset_split/dataset_split")
 
 
 def worker_init_fn(worker_id: int) -> None:
@@ -288,12 +287,12 @@ def train_model(
     """使用指定超参数训练 U-Net 模型，并返回 1 - dice 作为适应度值"""
     # 1. 创建数据集
     try:
-        # base_dir 是所有 npz 文件存放的路径，list_dir 是记录挑选进训练集（train）的病例的 txt 文件
+        # BASE_DIR 是所有 npz 文件存放的路径，LIST_DIR 是记录挑选进训练集（train）的病例的 txt 文件
         train_set = Custom_dataset(
-            base_dir, list_dir, split="train",
+            BASE_DIR, LIST_DIR, split="train",
             transform=transforms.Compose([RandomGenerator(output_size=[224, 224])])
         )
-        val_set = Custom_dataset(base_dir, list_dir, split="val", transform=None)
+        val_set = Custom_dataset(BASE_DIR, LIST_DIR, split="val", transform=None)
 
     except (AssertionError, RuntimeError, IndexError):
         print(f"Data loading error! ")
@@ -474,26 +473,44 @@ def train_model(
 
 
 # 用到测试集时删除注释符号使用
-# if __name__ == "__main__":
-#     base_path = "D:/Pytorch-UNet-master/good_model/"
-#     saved_models = os.path.join(base_path, "model_dice_0.8873,params_[1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 1, 0, 1, 0, 1, 0, 0, 1, 1, 1, 0, 1, 0, 1].pth")
-#     logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
-#     test_save_dir = "D:/unet_test"
-#
-#     if saved_models:
-#         model = torch.load(saved_models)
-#         model_name = os.path.basename(saved_models)
-#         print(f"Loaded model: {model_name}")
-#         print(model)
-#         device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-#         model = model.to(device)
-#
-#         # 开始对训练完的模型进行测试
-#         split = "test_vol"
-#         db_test = Custom_dataset(base_dir, list_dir, split=split)
-#         testloader = DataLoader(db_test, batch_size=1, shuffle=False, num_workers=1)
-#         evaluate(model, testloader, device, split, test_save_path=test_save_dir)
-#         torch.cuda.empty_cache()
+if __name__ == "__main__":
+    base_path = "D:/Pytorch-UNet-master/good_model/"
+    saved_models = os.path.join(base_path, "model_dice_0.8873,params_[1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 1, 0, 1, 0, 1, 0, 0, 1, 1, 1, 0, 1, 0, 1].pth")
+    logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
+    test_save_dir = "D:/unet_test"
+
+    if saved_models:
+        device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+
+        # 加载模型，提取超参数
+        checkpoint = torch.load(saved_models, map_location=device)
+        params = checkpoint["params"]
+
+        model = UNet(
+            n_channels=3,
+            n_classes=1,
+            blocks_number=checkpoint["blocks_number"],
+            filter_number=checkpoint["filters_number"],
+            filter_size=checkpoint["filter_size"],
+            activation=checkpoint["activation"],
+            pooling=checkpoint["pooling"],
+            use_dropout=checkpoint["use_dropout"],
+            use_batchnorm=checkpoint["use_batchnorm"],
+            use_attention=checkpoint["use_attention"]
+        )
+
+        model.load_state_dict(checkpoint["model_state"])
+
+        print(f"Loaded model: {os.path.basename(saved_models)}")
+        print(model)
+        model = model.to(device)
+
+        # 开始对训练完的模型进行测试
+        split = "test_vol"
+        db_test = Custom_dataset(BASE_DIR, LIST_DIR, split=split)
+        testloader = DataLoader(db_test, batch_size=1, shuffle=False, num_workers=1)
+        evaluate(model, testloader, device, split, test_save_path=test_save_dir)
+        torch.cuda.empty_cache()
 
 
 if __name__ == "__main__":
