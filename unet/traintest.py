@@ -103,9 +103,9 @@ class Decoder:
     def decode_blocks_number(key: Tuple[int, int]) -> int:
         """将二进制序列解码为块数"""
         mapping = {
-            (0, 0): 3,
-            (0, 1): 5,
-            (1, 0): 7,
+            (0, 0): 9,
+            (0, 1): 9,
+            (1, 0): 9,
             (1, 1): 9
         }
         return mapping[key]
@@ -473,50 +473,51 @@ def train_model(
 
 
 # 用到测试集时删除注释符号使用
-if __name__ == "__main__":
-    base_path = "D:/Pytorch-UNet-master/good_model/"
-    saved_models = os.path.join(base_path, "model_dice_0.8873,params_[1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 1, 0, 1, 0, 1, 0, 0, 1, 1, 1, 0, 1, 0, 1].pth")
-    logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
-    test_save_dir = "D:/unet_test"
-
-    if saved_models:
-        device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-
-        # 加载模型，提取超参数
-        checkpoint = torch.load(saved_models, map_location=device)
-        params = checkpoint["params"]
-
-        model = UNet(
-            n_channels=3,
-            n_classes=1,
-            blocks_number=checkpoint["blocks_number"],
-            filter_number=checkpoint["filters_number"],
-            filter_size=checkpoint["filter_size"],
-            activation=checkpoint["activation"],
-            pooling=checkpoint["pooling"],
-            use_dropout=checkpoint["use_dropout"],
-            use_batchnorm=checkpoint["use_batchnorm"],
-            use_attention=checkpoint["use_attention"]
-        )
-
-        model.load_state_dict(checkpoint["model_state"])
-
-        print(f"Loaded model: {os.path.basename(saved_models)}")
-        print(model)
-        model = model.to(device)
-
-        # 开始对训练完的模型进行测试
-        split = "test_vol"
-        db_test = Custom_dataset(BASE_DIR, LIST_DIR, split=split)
-        testloader = DataLoader(db_test, batch_size=1, shuffle=False, num_workers=1)
-        evaluate(model, testloader, device, split, test_save_path=test_save_dir)
-        torch.cuda.empty_cache()
+# if __name__ == "__main__":
+#     base_path = "D:/Pytorch-UNet-master/good_model/"
+#     saved_models = os.path.join(
+#         base_path,
+#         "model_dice_0.8873,params_[1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 1, 0, 1, 0, 1, 0, 0, 1, 1, 1, 0, 1, 0, 1].pth"
+#     )
+#     logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
+#     test_save_dir = "D:/unet_test"
+#
+#     if saved_models:
+#         device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+#
+#         # 加载模型，提取超参数
+#         checkpoint = torch.load(saved_models, map_location=device)
+#         params = checkpoint["params"]
+#
+#         model = UNet(
+#             n_channels=3,
+#             n_classes=1,
+#             blocks_number=checkpoint["blocks_number"],
+#             filter_number=checkpoint["filters_number"],
+#             filter_size=checkpoint["filter_size"],
+#             activation=checkpoint["activation"],
+#             pooling=checkpoint["pooling"],
+#             use_dropout=checkpoint["use_dropout"],
+#             use_batchnorm=checkpoint["use_batchnorm"],
+#             use_attention=checkpoint["use_attention"]
+#         )
+#
+#         model.load_state_dict(checkpoint["model_state"])
+#
+#         print(f"Loaded model: {os.path.basename(saved_models)}")
+#         print(model)
+#         model = model.to(device)
+#
+#         # 开始对训练完的模型进行测试
+#         split = "test_vol"
+#         db_test = Custom_dataset(BASE_DIR, LIST_DIR, split=split)
+#         testloader = DataLoader(db_test, batch_size=1, shuffle=False, num_workers=1)
+#         evaluate(model, testloader, device, split, test_save_path=test_save_dir)
+#         torch.cuda.empty_cache()
 
 
 if __name__ == "__main__":
     test_list = [
-        np.array([0,1, 0,1, 0,0, 0, 0,1, 1,0, 0,0,0,0,0,0,0,0,1,0, 0]),
-        # np.array([1,1, 1,1, 0,1, 1, 0,0, 1,0, 0,0,0,1,1,1,1,0,1,0, 0]),
-        # np.array([1,0, 1,0, 0,1, 0, 1,1, 1,0, 0,1,0,1,1,1,0,1,1,1, 1]),
+        np.array([1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 1, 0, 1, 0, 1, 0, 0, 1, 1, 1, 0, 1, 0, 1])
     ]
     testFunction(test_list, use_attention=True)

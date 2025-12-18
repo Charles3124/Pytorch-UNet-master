@@ -9,7 +9,7 @@ HLOCEtest.py
 import os
 import time
 import logging
-from typing import Optional, List, Dict, Any, Union
+from typing import Optional, Any, Union
 
 import numpy as np
 
@@ -53,7 +53,7 @@ def HLOCE(
         popSize: int = 10,
         bit: int = 24,
         rl: int = 50
-) -> Optional[List[Union[np.ndarray, np.int64]]]:
+) -> Optional[list[Union[np.ndarray, np.int64]]]:
     """HLOCE 调优 U-Net 超参数"""
     # 记录程序开始时间
     start_time = time.time()
@@ -91,7 +91,7 @@ def HLOCE(
         file.write("HLOCE优化过程结果：\n")
 
     # 初始化种群
-    pop: Dict[str, Any] = {
+    pop: dict[str, Any] = {
         "popus": np.random.randint(0, 2, (popSize, lenVar)),
         "fitness": None
     }
@@ -101,13 +101,13 @@ def HLOCE(
     ind = np.argmin(pop["fitness"])              # 最小值的位置
 
     # 初始化局部最优
-    individual: Dict[str, Any] = {
+    individual: dict[str, Any] = {
         "IKD": pop["popus"].copy(),
         "IKDfits": pop["fitness"].copy(),
     }
 
     # 初始化全局最优
-    global_best: Dict[str, Any] = {
+    global_best: dict[str, Any] = {
         "SKD": pop["popus"][ind].copy(),
         "SKDfit": pop["fitness"][ind]
     }

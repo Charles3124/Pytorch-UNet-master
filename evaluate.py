@@ -4,6 +4,7 @@ import logging
 from typing import Optional
 
 import torch
+from torch.utils.data import DataLoader
 from tqdm import tqdm
 import numpy as np
 
@@ -13,7 +14,7 @@ from utils.utils import test_single_volume
 @torch.inference_mode()
 def evaluate(
     net: torch.nn.Module,
-    dataloader: torch.utils.data.DataLoader,
+    dataloader: DataLoader,
     device: torch.device,
     split: str,
     test_save_path: Optional[str] = None
