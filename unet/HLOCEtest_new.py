@@ -75,9 +75,9 @@ def HLOCE_new(
     piMax = 0.92    # pi[i] 的上限
 
     # 计算 ps[i]
-    K2 = 0.81
+    K2 = 0.82
     Ks = 3
-    psMax = 0.86    # ps[i] 的上限
+    psMax = 0.87    # ps[i] 的上限
 
     # 有效信息相关参数
     lenVar = bit
