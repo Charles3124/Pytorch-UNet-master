@@ -1,8 +1,8 @@
 """
-HLOCEtest.py
+HLOCEtest_new.py
 
 功能: 使用 HLOCE 对 U-Net 超参数调优
-时间: 2025/11/30
+时间: 2025/12/19
 版本: 1.0
 """
 
@@ -48,10 +48,10 @@ def ce_prob(IKDfits: np.ndarray, IKD: np.ndarray, Ne: int) -> np.ndarray:
     return probabilities
 
 
-def HLOCE(
+def HLOCE_new(
         maxIter: int = 10,
         popSize: int = 10,
-        bit: int = 24,
+        bit: int = 22,
         rl: int = 50
 ) -> Optional[list[Union[np.ndarray, np.int64]]]:
     """HLOCE 调优 U-Net 超参数"""
@@ -71,13 +71,13 @@ def HLOCE(
 
     # 计算 pi[i]
     K1 = 0.83
-    Ki = 5
-    piMax = 0.9     # pi[i] 的上限
+    Ki = 4
+    piMax = 0.92    # pi[i] 的上限
 
     # 计算 ps[i]
-    K2 = 0.63
+    K2 = 0.81
     Ks = 3
-    psMax = 0.67    # ps[i] 的上限
+    psMax = 0.86    # ps[i] 的上限
 
     # 有效信息相关参数
     lenVar = bit
@@ -86,7 +86,7 @@ def HLOCE(
     ps0 = 0.64     # 在 sum 为 0 时使用的 ps 数值
 
     # 创建文件，保存最优解及运行时间
-    output_file = "HLOCE_results.txt"
+    output_file = "HLOCE_new_results.txt"
     with open(output_file, "w") as file:
         file.write("HLOCE优化过程结果：\n")
 
@@ -185,15 +185,14 @@ def HLOCE(
 
             # 记录当前最优解
             parameters = [
-                global_best["SKD"][0:2],    # 块数 3, 5, 7, 9
-                global_best["SKD"][2:4],    # 滤波器数量 4, 8, 16, 32
-                global_best["SKD"][4:6],    # 激活函数 ReLU, ELU, LeakyReLU, RReLU
-                global_best["SKD"][6],      # 池化层 max mean
-                global_best["SKD"][7:9],    # 优化器 Adamax, RMSprop, Adam, AdamW
-                global_best["SKD"][9:11],   # 批次大小 4, 8, 16, 32
-                global_best["SKD"][11:21],  # 学习率 [0.00001, 0.001]
-                global_best["SKD"][21],     # 批量归一化
-                global_best["SKD"][22:24]   # dropout
+                global_best["SKD"][0:2],    # 滤波器数量 4, 8, 16, 32
+                global_best["SKD"][2:4],    # 激活函数 ReLU, ELU, LeakyReLU, RReLU
+                global_best["SKD"][4],      # 池化层 max mean
+                global_best["SKD"][5:7],    # 优化器 Adamax, RMSprop, Adam, AdamW
+                global_best["SKD"][7:9],    # 批次大小 4, 8, 16, 32
+                global_best["SKD"][9:19],   # 学习率 [0.00001, 0.001]
+                global_best["SKD"][19],     # 批量归一化
+                global_best["SKD"][20:22]   # dropout
             ]
 
             # 将参数和适应度值写入文件
@@ -215,6 +214,6 @@ def HLOCE(
 
 
 if __name__ == "__main__":
-    best_params = HLOCE()
+    best_params = HLOCE_new()
     logging.info("Best hyperparameters found:")
     logging.info(best_params)

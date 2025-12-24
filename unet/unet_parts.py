@@ -20,10 +20,10 @@ class DoubleConv(nn.Module):
 
         padding = filter_size // 2 if filter_size % 2 != 0 else (filter_size - 1) // 2
 
-        # 主路径：移除第二个卷积后的激活函数
+        # 主路径
         layers = []
 
-        # 第一个卷积层（保持激活）
+        # 第一个卷积层
         layers.append(nn.Conv2d(in_channels, mid_channels, kernel_size=filter_size, padding=padding, bias=False))
 
         if use_batchnorm == 1:
@@ -43,20 +43,19 @@ class DoubleConv(nn.Module):
         elif use_dropout == 3:
             layers.append(GaussianDropout(p=0.3))
 
-        # 第二个卷积层（不添加激活函数）
+        # 第二个卷积层
         layers.append(nn.Conv2d(mid_channels, out_channels, kernel_size=filter_size, padding=padding, bias=False))
 
         if use_batchnorm == 1:
             layers.append(nn.BatchNorm2d(out_channels))
 
-        if use_dropout == 2:  # 保持 Dropout（如果需保留）
+        if use_dropout == 2:
             layers.append(nn.Dropout(p=0.3))
         elif use_dropout == 3:
             layers.append(GaussianDropout(p=0.3))
 
         self.double_conv = nn.Sequential(*layers)
 
-        # 残差后的激活函数
         if activation == 0:
             self.act = nn.ReLU(inplace=True)
         elif activation == 1:
