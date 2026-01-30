@@ -86,16 +86,16 @@ class Decoder:
         """解码二进制编码"""
         seq = cast(Tuple, tuple(binary_seq.tolist()))
         hparams = {
-            "blocks_number": cls.decode_blocks_number(seq[0:2]),
-            "filter_number": cls.decode_filter_number(seq[2:4]),
-            "filter_size": 3,
-            "activation": cls.decode_activation(seq[4:6]),
-            "pooling": seq[6],
-            "optimizer_type": cls.decode_optimizer(seq[7:9]),
-            "batch_size": cls.decode_batch_size(seq[9:11]),
-            "learning_rate": cls.bits_to_real(seq[11:21]),
-            "use_batchnorm": seq[21],
-            "use_dropout": cls.decode_dropout(seq[22:24])
+            "blocks_number": cls.decode_blocks_number(seq[0:2]),   # 块数
+            "filter_number": cls.decode_filter_number(seq[2:4]),   # 滤波器数量
+            "filter_size": 3,                                      # 卷积核大小
+            "activation": cls.decode_activation(seq[4:6]),         # 激活函数类型
+            "pooling": seq[6],                                     # 池化层类型
+            "optimizer_type": cls.decode_optimizer(seq[7:9]),      # 优化器类型
+            "batch_size": cls.decode_batch_size(seq[9:11]),        # 批量大小
+            "learning_rate": cls.bits_to_real(seq[11:21]),         # 学习率大小
+            "use_batchnorm": seq[21],                              # 批归一化操作
+            "use_dropout": cls.decode_dropout(seq[22:24])          # 随机丢弃操作
         }
         return hparams
 
@@ -449,7 +449,7 @@ def train_model(
             os.makedirs(save_dir)
 
         # 保存模型
-        model_name = f"model_dice_{val_score:.4f},params_{params}.pth"
+        model_name = f"model_dice_{val_score:.4f},params_[{''.join(map(str, params))}].pth"
         save_path = os.path.join(save_dir, model_name)
 
         checkpoint = {
@@ -481,7 +481,7 @@ if __name__ == "__main__":
     base_path = "D:/Pytorch-UNet-master/good_model/"
     saved_models = os.path.join(
         base_path,
-        "model_dice_0.8857,params_[1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 1, 0, 1, 0, 1, 0, 0, 1, 1, 1, 0, 1, 0, 1].pth"
+        "model_dice_0.8857,params_[1,1,1,1,0,0,0,0,0,0,1,0,1,0,1,0,0,1,1,1,0,1,0,1]-attention.pth"
     )
     logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
     test_save_dir = "D:/unet_test"
@@ -517,6 +517,33 @@ if __name__ == "__main__":
         testloader = DataLoader(db_test, batch_size=1, shuffle=False, num_workers=1)
         evaluate(model, testloader, device, split, test_save_path=test_save_dir)
         torch.cuda.empty_cache()
+
+
+# 用到测试集时删除注释符号使用
+# if __name__ == "__main__":
+#     base_path = "D:/Pytorch-UNet-master/good_model/"
+#     saved_models = os.path.join(
+#         base_path,
+#         "model_dice_0.8881,params_[1,1,1,1,0,0,0,0,0,0,1,0,1,0,1,0,0,1,1,1,0,1,0,1].pth"
+#     )
+#     logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
+#     test_save_dir = "D:/unet_test"
+#
+#     if saved_models:
+#         device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+#
+#         # 加载模型
+#         model = torch.load(saved_models, map_location=device)
+#
+#         print(f"Loaded model: {os.path.basename(saved_models)}")
+#         model = model.to(device)
+#
+#         # 开始对训练完的模型进行测试
+#         split = "test_vol"
+#         db_test = Custom_dataset(BASE_DIR, LIST_DIR, split=split)
+#         testloader = DataLoader(db_test, batch_size=1, shuffle=False, num_workers=1)
+#         evaluate(model, testloader, device, split, test_save_path=test_save_dir)
+#         torch.cuda.empty_cache()
 
 
 # if __name__ == "__main__":
