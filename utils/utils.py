@@ -1,4 +1,10 @@
-# utils.py
+"""
+utils.py
+
+功能: 测试辅助函数
+时间: 2026/03/20
+版本: 1.0
+"""
 
 import os
 import copy

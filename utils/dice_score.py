@@ -1,4 +1,10 @@
-# dice_score.py
+"""
+dice_score.py
+
+功能: 指标计算函数
+时间: 2026/03/20
+版本: 1.0
+"""
 
 import torch
 from torch import Tensor

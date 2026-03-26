@@ -1,5 +1,11 @@
-# unet_model9.py
-""" Full assembly of the parts to form the complete network """
+"""
+unet_model9.py
+
+功能: Full assembly of the parts to form the complete network
+时间: 2026/03/20
+版本: 1.0
+"""
+
 
 from .unet_parts import *
 

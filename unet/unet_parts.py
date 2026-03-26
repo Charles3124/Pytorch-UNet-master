@@ -1,5 +1,10 @@
-# unet_parts.py
-""" Parts of the U-Net model """
+"""
+unet_parts.py
+
+功能: Parts of the U-Net model
+时间: 2026/03/20
+版本: 1.0
+"""
 
 from typing import Optional, Callable
 
@@ -118,7 +123,7 @@ class Up(nn.Module):
 
         # Attention 模块
         self.use_attention = use_attention
-        if use_attention:
+        if self.use_attention:
             self.attention = AttentionBlock(F_g=F_g, F_l=F_l, F_int=F_int)
 
     def forward(self, x1: torch.Tensor, x2: torch.Tensor) -> torch.Tensor:

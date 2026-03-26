@@ -1,5 +1,5 @@
 """
-HLOCEtest.py
+HLOCE_test_v1_0.py
 
 功能: 使用 HLOCE 对 U-Net 超参数调优
 时间: 2025/11/30
@@ -48,7 +48,7 @@ def ce_prob(IKDfits: np.ndarray, IKD: np.ndarray, Ne: int) -> np.ndarray:
     return probabilities
 
 
-def HLOCE(
+def HLOCE_v1_0(
         maxIter: int = 10,
         popSize: int = 10,
         bit: int = 24,
@@ -86,7 +86,7 @@ def HLOCE(
     ps0 = 0.64     # 在 sum 为 0 时使用的 ps 数值
 
     # 创建文件，保存最优解及运行时间
-    output_file = "HLOCE_results.txt"
+    output_file = "HLOCE_test_v1_0_results.txt"
     with open(output_file, "w") as file:
         file.write("HLOCE优化过程结果：\n")
 
@@ -215,6 +215,6 @@ def HLOCE(
 
 
 if __name__ == "__main__":
-    best_params = HLOCE()
+    best_params = HLOCE_v1_0()
     logging.info("Best hyperparameters found:")
     logging.info(best_params)

@@ -1,9 +1,10 @@
 """
-HLOCEtest_new.py
+HLOCE_test_v2_0.py
 
 功能: 使用 HLOCE 对 U-Net 超参数调优
 时间: 2025/12/19
-版本: 1.0
+版本: 2.0
+修改: 在 1.0 版本上去掉了对网络层数的改进
 """
 
 import os
@@ -20,21 +21,6 @@ os.environ["KMP_DUPLICATE_LIB_OK"] = "TRUE"
 logging.basicConfig(level=logging.INFO, format="%(levelname)s: %(message)s")
 
 
-def fix_invalid_combinations(popus: np.ndarray) -> np.ndarray:
-    """如果个体是 (blocks = 7 或 9) 且 filters = 32，则把 filters 改为 16，以免耗时过长"""
-    popus_fixed = popus.copy()
-
-    for i in range(len(popus_fixed)):
-        block_bits = tuple(popus_fixed[i, 0:2])
-        filter_bits = tuple(popus_fixed[i, 2:4])
-
-        if block_bits in [(1, 0), (1, 1)]:  # blocks = 7 或 9
-            if filter_bits == (1, 1):       # filters = 32
-                popus_fixed[i, 3] = 0       # 改为 filters = 16 -> (1, 0)
-
-    return popus_fixed
-
-
 def initialize_multinoulli_parameters(m: int) -> np.ndarray:
     """初始化伯努利参数"""
     return np.random.rand(m)
@@ -48,11 +34,12 @@ def ce_prob(IKDfits: np.ndarray, IKD: np.ndarray, Ne: int) -> np.ndarray:
     return probabilities
 
 
-def HLOCE_new(
+def HLOCE_v2_0(
         maxIter: int = 10,
         popSize: int = 10,
         bit: int = 22,
-        rl: int = 50
+        rl: int = 50,
+        use_attention: bool = True
 ) -> Optional[list[Union[np.ndarray, np.int64]]]:
     """HLOCE 调优 U-Net 超参数"""
     # 记录程序开始时间
@@ -86,7 +73,7 @@ def HLOCE_new(
     ps0 = 0.64     # 在 sum 为 0 时使用的 ps 数值
 
     # 创建文件，保存最优解及运行时间
-    output_file = "HLOCE_new_results.txt"
+    output_file = f"HLOCE_test_v2_0_results_{'attention' if use_attention else 'baseline'}.txt"
     with open(output_file, "w") as file:
         file.write("HLOCE优化过程结果：\n")
 
@@ -96,9 +83,8 @@ def HLOCE_new(
         "fitness": None
     }
 
-    pop["popus"] = fix_invalid_combinations(pop["popus"])
-    pop["fitness"] = testFunction(pop["popus"])  # 不同参数模型的损失
-    ind = np.argmin(pop["fitness"])              # 最小值的位置
+    pop["fitness"] = testFunction(pop["popus"], use_attention=use_attention)  # 不同参数模型的损失
+    ind = np.argmin(pop["fitness"])                                           # 最小值的位置
 
     # 初始化局部最优
     individual: dict[str, Any] = {
@@ -122,7 +108,7 @@ def HLOCE_new(
     parameters = None
     for it in range(maxIter):
         # 计算交叉熵概率
-        ber_params = ce_prob(individual["IKDfits"], individual["IKD"], 5)
+        ber_params = ce_prob(individual["IKDfits"], individual["IKD"], 3)
 
         # 平滑更新概率参数
         ber_params_after = a * ber_params + (1 - a) * ber_params_before
@@ -158,7 +144,7 @@ def HLOCE_new(
                         pop["popus"][i][j] = global_best["SKD"][j]
 
         # 更新适应度值
-        pop["fitness"] = testFunction(pop["popus"])
+        pop["fitness"] = testFunction(pop["popus"], use_attention=use_attention)
 
         # 更新个体最优
         for i in range(0, popSize):
@@ -171,10 +157,8 @@ def HLOCE_new(
 
             # 重新初始化
             if count[i] == rl:
-                candidate = np.random.randint(0, 2, lenVar)
-                candidate = fix_invalid_combinations(candidate.reshape(1, -1))[0]
-                individual["IKD"][i] = candidate
-                individual["IKDfits"][i] = testFunction(individual["IKD"][i].reshape(1, -1))[0]
+                individual["IKD"][i] = np.random.randint(0, 2, lenVar)
+                individual["IKDfits"][i] = testFunction(params_list=[individual["IKD"][i]], use_attention=use_attention)[0]
                 count[i] = 0
 
         # 寻找全局最优
@@ -214,6 +198,6 @@ def HLOCE_new(
 
 
 if __name__ == "__main__":
-    best_params = HLOCE_new()
+    best_params = HLOCE_v2_0()
     logging.info("Best hyperparameters found:")
     logging.info(best_params)

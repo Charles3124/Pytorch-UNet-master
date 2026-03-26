@@ -1,11 +1,17 @@
-# traintest.py
+"""
+traintest.py
+
+功能: 训练和测试主函数
+时间: 2026/03/20
+版本: 1.0
+"""
 
 import os
 import gc
 import random
 import logging
 from pathlib import Path
-from typing import Optional, List, Tuple, Dict, Any, cast
+from typing import Optional, List, Dict, Any
 
 import wandb
 from tqdm import tqdm
@@ -17,6 +23,7 @@ from torch import optim
 from torch.utils.data import DataLoader
 from torchvision import transforms
 
+from decoders import Decoder, DecoderMixed
 from evaluate import evaluate
 from unet import UNet3, UNet5, UNet7, UNet9
 from utils.data_loading import Custom_dataset
@@ -78,133 +85,23 @@ def UNet(
     return None
 
 
-class Decoder:
-    """超参数解码器"""
-
-    @classmethod
-    def decode(cls, binary_seq: np.ndarray) -> Dict[str, Any]:
-        """解码二进制编码"""
-        seq = cast(Tuple, tuple(binary_seq.tolist()))
-        hparams = {
-            "blocks_number": cls.decode_blocks_number(seq[0:2]),   # 块数
-            "filter_number": cls.decode_filter_number(seq[2:4]),   # 滤波器数量
-            "filter_size": 3,                                      # 卷积核大小
-            "activation": cls.decode_activation(seq[4:6]),         # 激活函数类型
-            "pooling": seq[6],                                     # 池化层类型
-            "optimizer_type": cls.decode_optimizer(seq[7:9]),      # 优化器类型
-            "batch_size": cls.decode_batch_size(seq[9:11]),        # 批量大小
-            "learning_rate": cls.bits_to_real(seq[11:21]),         # 学习率大小
-            "use_batchnorm": seq[21],                              # 批归一化操作
-            "use_dropout": cls.decode_dropout(seq[22:24])          # 随机丢弃操作
-        }
-        return hparams
-
-    @staticmethod
-    def decode_blocks_number(key: Tuple[int, int]) -> int:
-        """将二进制序列解码为块数"""
-        mapping = {
-            (0, 0): 9,
-            (0, 1): 9,
-            (1, 0): 9,
-            (1, 1): 9
-        }
-        return mapping[key]
-
-    @staticmethod
-    def decode_filter_number(key: Tuple[int, int]) -> int:
-        """将二进制序列解码为滤波器数量"""
-        mapping = {
-            (0, 0): 4,
-            (0, 1): 8,
-            (1, 0): 16,
-            (1, 1): 32
-        }
-        return mapping[key]
-
-    @staticmethod
-    def decode_filter_size(key: Tuple[int, int]) -> int:
-        """将二进制序列解码为卷积核大小"""
-        mapping = {
-            (0, 0): 3,
-            (0, 1): 5,
-            (1, 0): 7,
-            (1, 1): 3
-        }
-        return mapping[key]
-
-    @staticmethod
-    def decode_activation(key: Tuple[int, int]) -> int:
-        """将二进制序列解码为激活函数索引"""
-        mapping = {
-            (0, 0): 0,
-            (0, 1): 1,
-            (1, 0): 2,
-            (1, 1): 3
-        }
-        return mapping[key]
-
-    @staticmethod
-    def decode_pooling(key: int) -> int:
-        """将二进制值解码为池化类型索引"""
-        return key
-
-    @staticmethod
-    def decode_optimizer(key: Tuple[int, int]) -> str:
-        """将二进制序列解码为优化器名称"""
-        mapping = {
-            (0, 0): "Adamax",   # SGD
-            (0, 1): "RMSprop",
-            (1, 0): "Adam",
-            (1, 1): "AdamW"
-        }
-        return mapping[key]
-
-    @staticmethod
-    def decode_batch_size(key: Tuple[int, int]) -> int:
-        """将二进制序列解码为批量大小"""
-        mapping = {
-            (0, 0): 4,
-            (0, 1): 8,
-            (1, 0): 16,
-            (1, 1): 32
-        }
-        return mapping[key]
-
-    # 小批量训练带来了更多权重更新的可能性，在学习率较大时难以收敛
-    # 大批量训练则更接近用整个数据集进行训练，只要数据集正确，则更容易收敛，则可以用较大的学习率也不用担心收敛问题
-    @staticmethod
-    def bits_to_real(bit_sequence: Tuple[int, int, int, int, int, int, int, int, int, int]) -> float:
-        """根据 10 比特的输入比特序列，将其映射到 [0.00001, 0.01] 范围内的实数"""
-        bit_string = "".join(map(str, bit_sequence))     # 转换为二进制字符串
-        bit_value = int(bit_string, 2)                   # 按二进制解析为整数
-        max_value = 0.001                                # 映射范围的最大值
-        min_value = 0.00001                              # 映射范围的最小值
-        scale = max_value - min_value                    # 映射范围
-        result = max_value - (bit_value / 1023) * scale  # 映射到 [0.00001, 0.01]
-        return result
-
-    @staticmethod
-    def decode_dropout(key: Tuple[int, int]) -> int:
-        """将二进制序列解码为 dropout 索引"""
-        mapping = {
-            (0, 0): 0,
-            (0, 1): 1,
-            (1, 0): 2,
-            (1, 1): 3
-        }
-        return mapping.get(key, 0)
-
-
-def testFunction(params_list: List[np.ndarray], use_attention: bool = False) -> List[float]:
+def testFunction(params_list: List[np.ndarray], lr_pop=None, use_attention: bool = False) -> List[float]:
     """根据参数列表训练模型，返回每组参数对应的损失值"""
     losses = []
 
-    for params in params_list:
-        if len(params) == 22:
-            params = np.r_[1, 1, params]
+    for i, params in enumerate(params_list):
+        # HLOCE + CHLOCE 超参数解码
+        if len(params) == 12:
+            hparams = DecoderMixed.decode(params)
+            hparams["learning_rate"] = lr_pop[i][0]
 
-        # 从参数中提取不同的超参数
-        hparams = Decoder.decode(params)
+        # HLOCE 超参数解码
+        else:
+            if len(params) == 22:
+                params = np.r_[1, 1, params]
+
+            hparams = Decoder.decode(params)
+
         hparams["use_attention"] = use_attention
         logging.info(f"二进制超参数解码结果: {hparams.values()}")
 
@@ -449,7 +346,7 @@ def train_model(
             os.makedirs(save_dir)
 
         # 保存模型
-        model_name = f"model_dice_{val_score:.4f},params_[{''.join(map(str, params))}].pth"
+        model_name = f"model_dice_{val_score:.4f},params_[{','.join(map(str, params))}].pth"
         save_path = os.path.join(save_dir, model_name)
 
         checkpoint = {
@@ -477,63 +374,37 @@ def train_model(
 
 
 # 用到测试集时删除注释符号使用
-if __name__ == "__main__":
-    base_path = "D:/Pytorch-UNet-master/good_model/"
-    saved_models = os.path.join(
-        base_path,
-        "model_dice_0.8857,params_[1,1,1,1,0,0,0,0,0,0,1,0,1,0,1,0,0,1,1,1,0,1,0,1]-attention.pth"
-    )
-    logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
-    test_save_dir = "D:/unet_test"
-
-    if saved_models:
-        device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-
-        # 加载模型，提取超参数
-        checkpoint = torch.load(saved_models, map_location=device)
-        params = checkpoint["params"]
-
-        model = UNet(
-            n_channels=3,
-            n_classes=1,
-            blocks_number=checkpoint["blocks_number"],
-            filter_number=checkpoint["filters_number"],
-            filter_size=checkpoint["filter_size"],
-            activation=checkpoint["activation"],
-            pooling=checkpoint["pooling"],
-            use_dropout=checkpoint["use_dropout"],
-            use_batchnorm=checkpoint["use_batchnorm"],
-            use_attention=checkpoint["use_attention"]
-        )
-
-        model.load_state_dict(checkpoint["model_state"])
-
-        print(f"Loaded model: {os.path.basename(saved_models)}")
-        model = model.to(device)
-
-        # 开始对训练完的模型进行测试
-        split = "test_vol"
-        db_test = Custom_dataset(BASE_DIR, LIST_DIR, split=split)
-        testloader = DataLoader(db_test, batch_size=1, shuffle=False, num_workers=1)
-        evaluate(model, testloader, device, split, test_save_path=test_save_dir)
-        torch.cuda.empty_cache()
-
-
-# 用到测试集时删除注释符号使用
 # if __name__ == "__main__":
 #     base_path = "D:/Pytorch-UNet-master/good_model/"
 #     saved_models = os.path.join(
 #         base_path,
-#         "model_dice_0.8881,params_[1,1,1,1,0,0,0,0,0,0,1,0,1,0,1,0,0,1,1,1,0,1,0,1].pth"
+#         "model_dice_0.8857,params_[1,1,1,1,0,0,0,0,0,0,1,0,1,0,1,0,0,1,1,1,0,1,0,1]-attention.pth"
 #     )
 #     logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
-#     test_save_dir = "D:/unet_test"
+#     test_save_dir = "D:/unet_test/"
 #
 #     if saved_models:
 #         device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 #
-#         # 加载模型
-#         model = torch.load(saved_models, map_location=device)
+#         # 加载模型，提取超参数
+#         checkpoint = torch.load(saved_models, map_location=device)
+#         params = checkpoint["params"]
+#         print(f"模型是否使用 Attention: {checkpoint['use_attention']}")
+#
+#         model = UNet(
+#             n_channels=3,
+#             n_classes=1,
+#             blocks_number=checkpoint["blocks_number"],
+#             filter_number=checkpoint["filters_number"],
+#             filter_size=checkpoint["filter_size"],
+#             activation=checkpoint["activation"],
+#             pooling=checkpoint["pooling"],
+#             use_dropout=checkpoint["use_dropout"],
+#             use_batchnorm=checkpoint["use_batchnorm"],
+#             use_attention=checkpoint["use_attention"]
+#         )
+#
+#         model.load_state_dict(checkpoint["model_state"])
 #
 #         print(f"Loaded model: {os.path.basename(saved_models)}")
 #         model = model.to(device)
@@ -544,6 +415,41 @@ if __name__ == "__main__":
 #         testloader = DataLoader(db_test, batch_size=1, shuffle=False, num_workers=1)
 #         evaluate(model, testloader, device, split, test_save_path=test_save_dir)
 #         torch.cuda.empty_cache()
+
+
+# 用到测试集时删除注释符号使用
+if __name__ == "__main__":
+    base_path = "D:/Pytorch-UNet-master/good_model/"
+    saved_models = os.path.join(
+        base_path,
+        "model_dice_0.8881,params_[1,1,1,1,0,0,0,0,0,0,1,0,1,0,1,0,0,1,1,1,0,1,0,1].pth"
+    )
+    logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
+    test_save_dir = "D:/unet_test/"
+
+    if saved_models:
+        device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+
+        # 加载模型
+        model = torch.load(saved_models, map_location=device)
+
+        print(f"Loaded model: {os.path.basename(saved_models)}")
+        model = model.to(device)
+
+        # 动态给 Up 模块添加属性，防止 forward 报错
+        for module in model.modules():
+            if module.__class__.__name__ == "Up":
+                if not hasattr(module, "use_attention"):
+                    module.use_attention = False
+
+        # 构建测试集
+        split = "test_vol"
+        db_test = Custom_dataset(BASE_DIR, LIST_DIR, split=split)
+        testloader = DataLoader(db_test, batch_size=1, shuffle=False, num_workers=1)
+
+        # 开始测试
+        evaluate(model, testloader, device, split, test_save_path=test_save_dir)
+        torch.cuda.empty_cache()
 
 
 # if __name__ == "__main__":
