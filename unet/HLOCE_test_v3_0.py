@@ -172,6 +172,8 @@ class CHLOCEOptimizer:
                         popus[i][j] = (sign * self.K2 * np.random.rand() * direction
                                        + np.random.normal(SKD[j], self.K3 * abs(direction)))
 
+                popus[i][j] = np.clip(popus[i][j], self.xMin, self.xMax)
+
         return popus
 
     @staticmethod

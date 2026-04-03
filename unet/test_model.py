@@ -1,0 +1,144 @@
+"""
+test_model.py
+
+功能: 测试模型
+时间: 2026/04/03
+版本: 1.0
+"""
+
+import logging
+from pathlib import Path
+from typing import Optional
+
+import torch
+import pandas as pd
+from torch.utils.data import DataLoader
+
+from traintest import UNet, ROOT_DIR, BASE_DIR, LIST_DIR
+from evaluate import evaluate
+from utils.data_loading import Custom_dataset
+
+
+def test_model(saved_models: str, test_save_dir: Optional[str] = None, split: str = "test_vol"):
+    """测试模型"""
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+
+    # 加载模型，提取超参数
+    checkpoint = torch.load(saved_models, map_location=device)
+    params = {
+        "learning_rate": checkpoint["learning_rate"],
+        "blocks_number": checkpoint["blocks_number"],
+        "filters_number": checkpoint["filters_number"],
+        "filter_size": checkpoint["filter_size"],
+        "activation": checkpoint["activation"],
+        "pooling": checkpoint["pooling"],
+        "use_dropout": checkpoint["use_dropout"],
+        "use_batchnorm": checkpoint["use_batchnorm"],
+        "use_attention": checkpoint["use_attention"]
+    }
+
+    model = UNet(
+        n_channels=3,
+        n_classes=1,
+        blocks_number=params["blocks_number"],
+        filter_number=params["filters_number"],
+        filter_size=params["filter_size"],
+        activation=params["activation"],
+        pooling=params["pooling"],
+        use_dropout=params["use_dropout"],
+        use_batchnorm=params["use_batchnorm"],
+        use_attention=params["use_attention"]
+    )
+
+    model.load_state_dict(checkpoint["model_state"])
+    model = model.to(device)
+
+    # 对训练完的模型进行测试
+    db_test = Custom_dataset(BASE_DIR, LIST_DIR, split=split)
+    testloader = DataLoader(db_test, batch_size=1, shuffle=False, num_workers=1)
+    test_results = evaluate(model, testloader, device, split, test_save_path=test_save_dir)
+    torch.cuda.empty_cache()
+
+    return params, test_results
+
+
+# 批量测试模型
+if __name__ == "__main__":
+    # 配置参数
+    models_dir = f"{ROOT_DIR}/Pytorch-UNet-master/good_model/"
+    excel_save_path = f"{ROOT_DIR}/Pytorch-UNet-master/model_test_results.xlsx"
+
+    # 日志配置
+    logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
+
+    # 获取所有模型文件
+    model_dir_path = Path(models_dir)
+    model_files = list(model_dir_path.glob("*.pth"))
+
+    logging.info(f"找到 {len(model_files)} 个模型文件")
+
+    # 存储结果
+    results_list = []
+
+    # 测试模型
+    for i, model_path in enumerate(model_files, 1):
+        # 不含扩展名的文件名
+        model_name = model_path.stem
+        logging.info(f"[{i}/{len(model_files)}] 测试模型: {model_name}")
+
+        # 调用测试函数
+        params, (mean_dice, std_dice, iou, iou_std) = test_model(saved_models=str(model_path))
+
+        # 保存结果
+        result = {
+            "model_name": model_name,
+            "mean_dice": mean_dice,
+            "std_dice": std_dice,
+            "mean_iou": iou,
+            "std_iou": iou_std,
+            "learning_rate": params["learning_rate"],
+            "blocks_number": params["blocks_number"],
+            "filter_number": params["filters_number"],
+            "filter_size": params["filter_size"],
+            "activation": params["activation"],
+            "pooling": params["pooling"],
+            "use_dropout": params["use_dropout"],
+            "use_batchnorm": params["use_batchnorm"],
+            "use_attention": params["use_attention"]
+        }
+        results_list.append(result)
+
+    # 保存结果到 Excel
+    df = pd.DataFrame(results_list)
+    excel_save_path = Path(excel_save_path)
+    excel_save_path.parent.mkdir(parents=True, exist_ok=True)
+
+    with pd.ExcelWriter(excel_save_path, engine="openpyxl") as writer:
+        df.to_excel(writer, sheet_name="Test Results", index=False)
+
+        # 获取工作表并调整列宽
+        worksheet = writer.sheets["Test Results"]
+        for column in worksheet.columns:
+            max_length = 0
+            column_letter = column[0].column_letter
+            for cell in column:
+                if len(str(cell.value)) > max_length:
+                    max_length = len(str(cell.value))
+            adjusted_width = min(max_length + 2, 50)
+            worksheet.column_dimensions[column_letter].width = adjusted_width
+
+    logging.info(f"结果已保存到: {excel_save_path}")
+
+
+# 测试模型
+# if __name__ == "__main__":
+#     base_path = f"{ROOT_DIR}/Pytorch-UNet-master/good_model/"
+#     saved_models = os.path.join(
+#         base_path,
+#         "model_dice_0.8857,params_[1,1,1,1,0,0,0,0,0,0,1,0,1,0,1,0,0,1,1,1,0,1,0,1]-attention.pth"
+#     )
+#     logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
+#     test_save_dir = f"{ROOT_DIR}/unet_test/"
+#
+#     if saved_models:
+#         test_results = test_model(saved_models)

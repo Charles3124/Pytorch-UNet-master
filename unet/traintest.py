@@ -34,8 +34,9 @@ from npz_preprocess import RandomGenerator
 os.environ["KMP_DUPLICATE_LIB_OK"] = "True"
 logging.basicConfig(level=logging.INFO, format="%(levelname)s: %(message)s")
 
-BASE_DIR = Path("D:/unet_data/dataset_split/npzgood")
-LIST_DIR = Path("D:/unet_data/dataset_split/dataset_split")
+ROOT_DIR = "D:"
+BASE_DIR = Path(f"{ROOT_DIR}/unet_data/dataset_split/npzgood")
+LIST_DIR = Path(f"{ROOT_DIR}/unet_data/dataset_split/dataset_split")
 
 
 def worker_init_fn(worker_id: int) -> None:
@@ -172,6 +173,7 @@ def train_model(
         momentum: float = 0.9,
         gradient_clipping: float = 1.0
 ) -> float:
+    """使用指定超参数训练 U-Net 模型，并返回 1 - dice 作为适应度值"""
     # 提取超参数
     blocks_number = hparams["blocks_number"]
     filter_number = hparams["filter_number"]
@@ -185,7 +187,6 @@ def train_model(
     use_dropout = hparams["use_dropout"]
     use_attention = hparams["use_attention"]
 
-    """使用指定超参数训练 U-Net 模型，并返回 1 - dice 作为适应度值"""
     # 1. 创建数据集
     try:
         # BASE_DIR 是所有 npz 文件存放的路径，LIST_DIR 是记录挑选进训练集（train）的病例的 txt 文件
@@ -346,7 +347,10 @@ def train_model(
             os.makedirs(save_dir)
 
         # 保存模型
-        model_name = f"model_dice_{val_score:.4f},params_[{','.join(map(str, params))}].pth"
+        model_name = (
+            f"model_dice_{val_score:.4f},params_[{','.join(map(str, params))}]_"
+            f"{'attention' if use_attention else 'baseline'}.pth"
+        )
         save_path = os.path.join(save_dir, model_name)
 
         checkpoint = {
@@ -373,68 +377,24 @@ def train_model(
     return 1 - val_score
 
 
-# 用到测试集时删除注释符号使用
-# if __name__ == "__main__":
-#     base_path = "D:/Pytorch-UNet-master/good_model/"
-#     saved_models = os.path.join(
-#         base_path,
-#         "model_dice_0.8857,params_[1,1,1,1,0,0,0,0,0,0,1,0,1,0,1,0,0,1,1,1,0,1,0,1]-attention.pth"
-#     )
-#     logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
-#     test_save_dir = "D:/unet_test/"
-#
-#     if saved_models:
-#         device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-#
-#         # 加载模型，提取超参数
-#         checkpoint = torch.load(saved_models, map_location=device)
-#         params = checkpoint["params"]
-#         print(f"模型是否使用 Attention: {checkpoint['use_attention']}")
-#
-#         model = UNet(
-#             n_channels=3,
-#             n_classes=1,
-#             blocks_number=checkpoint["blocks_number"],
-#             filter_number=checkpoint["filters_number"],
-#             filter_size=checkpoint["filter_size"],
-#             activation=checkpoint["activation"],
-#             pooling=checkpoint["pooling"],
-#             use_dropout=checkpoint["use_dropout"],
-#             use_batchnorm=checkpoint["use_batchnorm"],
-#             use_attention=checkpoint["use_attention"]
-#         )
-#
-#         model.load_state_dict(checkpoint["model_state"])
-#
-#         print(f"Loaded model: {os.path.basename(saved_models)}")
-#         model = model.to(device)
-#
-#         # 开始对训练完的模型进行测试
-#         split = "test_vol"
-#         db_test = Custom_dataset(BASE_DIR, LIST_DIR, split=split)
-#         testloader = DataLoader(db_test, batch_size=1, shuffle=False, num_workers=1)
-#         evaluate(model, testloader, device, split, test_save_path=test_save_dir)
-#         torch.cuda.empty_cache()
-
-
-# 用到测试集时删除注释符号使用
+# 测试模型（旧版）
 if __name__ == "__main__":
-    base_path = "D:/Pytorch-UNet-master/good_model/"
+    base_path = f"{ROOT_DIR}/Pytorch-UNet-master/good_model/"
     saved_models = os.path.join(
         base_path,
         "model_dice_0.8881,params_[1,1,1,1,0,0,0,0,0,0,1,0,1,0,1,0,0,1,1,1,0,1,0,1].pth"
     )
     logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
-    test_save_dir = "D:/unet_test/"
+    test_save_dir = f"{ROOT_DIR}/unet_test/"
 
     if saved_models:
         device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
         # 加载模型
         model = torch.load(saved_models, map_location=device)
+        model = model.to(device)
 
         print(f"Loaded model: {os.path.basename(saved_models)}")
-        model = model.to(device)
 
         # 动态给 Up 模块添加属性，防止 forward 报错
         for module in model.modules():
@@ -454,6 +414,6 @@ if __name__ == "__main__":
 
 # if __name__ == "__main__":
 #     test_list = [
-#         np.array([1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 1, 0, 1, 0, 1, 0, 0, 1, 1, 1, 0, 1, 0, 1])
+#         np.array([1,1,1,1,0,0,0,0,0,0,1,0,1,0,1,0,0,1,1,1,0,1,0,1])
 #     ]
 #     testFunction(test_list, use_attention=True)

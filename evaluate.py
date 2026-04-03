@@ -21,7 +21,7 @@ from utils.utils import test_single_volume
 def evaluate(
     net: torch.nn.Module, dataloader: DataLoader,
     device: torch.device, split: str, test_save_path: Optional[str] = None
-) -> float:
+) -> tuple[float, float, float, float]:
     """对整个数据集进行推理并计算平均 Dice 指标"""
     amp = False
     net.eval()
@@ -63,4 +63,4 @@ def evaluate(
         )
 
     net.train()
-    return performance
+    return performance, performance_std, iou, iou_std
