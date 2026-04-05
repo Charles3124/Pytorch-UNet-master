@@ -327,7 +327,7 @@ def train_model(
                 histograms["Gradients/" + tag] = wandb.Histogram(value.grad.data.cpu())
 
         # 验证阶段
-        val_score = evaluate(model, val_loader, device, split="val")
+        val_score = evaluate(model, val_loader, device, split="val")[0]
         logging.info(f"Validation Dice score: {val_score}")
 
         if epoch >= 20:
