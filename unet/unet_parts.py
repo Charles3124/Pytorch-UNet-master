@@ -194,6 +194,11 @@ class AttentionBlock(nn.Module):
 
     def __init__(self, hparams: Dict[str, Any], F_g: int, F_l: int, F_int: int):
         super(AttentionBlock, self).__init__()
+
+        # 提取超参数
+        attention_activation = hparams["attention_activation"]
+        self.attention_fusion = hparams["attention_fusion"]
+
         self.W_g = nn.Sequential(
             nn.Conv2d(F_g, F_int, kernel_size=1, stride=1, padding=0, bias=True),
             nn.BatchNorm2d(F_int)
@@ -204,9 +209,10 @@ class AttentionBlock(nn.Module):
             nn.BatchNorm2d(F_int)
         )
 
+        in_channels = F_int if self.attention_fusion == 0 else F_int * 2
         self.psi = nn.Sequential(
-            nn.Conv2d(F_int, out_channels=1, kernel_size=1, stride=1, padding=0, bias=True),
-            nn.Sigmoid()
+            nn.Conv2d(in_channels, out_channels=1, kernel_size=1, stride=1, padding=0, bias=True),
+            nn.Sigmoid() if attention_activation == 0 else nn.Hardsigmoid()
         )
 
         self.relu = nn.ReLU(inplace=True)
@@ -214,6 +220,11 @@ class AttentionBlock(nn.Module):
     def forward(self, g, x):
         g1 = self.W_g(g)
         x1 = self.W_x(x)
-        psi = self.relu(g1 + x1)
+
+        if self.attention_fusion == 0:  # 加法
+            psi = self.relu(g1 + x1)
+        else:                           # 拼接
+            psi = self.relu(torch.cat([g1, x1], dim=1))
+
         psi = self.psi(psi)
         return x * psi

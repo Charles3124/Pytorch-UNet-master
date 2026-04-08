@@ -200,7 +200,7 @@ class CHLOCEOptimizer:
 def HLOCE_v3_0(
         max_iter: int = 10,
         pop_size: int = 10,
-        bit: int = 12,
+        bit: int = 16,
         lr_dim: int = 1,
         rl: int = 50,
         use_attention: bool = True
@@ -297,14 +297,17 @@ def HLOCE_v3_0(
             global_best["lr_SKD"] = lr_individual["IKD"][ind].copy()
 
             parameters = [
+                global_best["lr_SKD"],      # 学习率 [0.00001, 0.001]
                 global_best["SKD"][0:2],    # 滤波器数量 4, 8, 16, 32
                 global_best["SKD"][2:4],    # 激活函数 ReLU, ELU, LeakyReLU, RReLU
-                global_best["SKD"][4],      # 池化层 max mean
+                global_best["SKD"][4],      # 池化层 MaxPool2d, AvgPool2d
                 global_best["SKD"][5:7],    # 优化器 Adamax, RMSprop, Adam, AdamW
                 global_best["SKD"][7:9],    # 批次大小 4, 8, 16, 32
-                global_best["lr_SKD"],      # 学习率 [0.00001, 0.001]
-                global_best["SKD"][9],      # 批量归一化
-                global_best["SKD"][10:12]   # dropout
+                global_best["SKD"][9],      # 批量归一化 使用，不使用
+                global_best["SKD"][10:12],  # dropout 不使用，Dropout，GaussianDropout
+                global_best["SKD"][12:14],  # 中间通道数 // 1, // 2, // 4, // 8
+                global_best["SKD"][14],     # 输出激活函数 Sigmoid, Hardsigmoid
+                global_best["SKD"][15],     # 融合方式 加法，拼接
             ]
 
             with open(output_file, "a") as file:
@@ -312,7 +315,7 @@ def HLOCE_v3_0(
                 file.write(f"参数：{parameters}\n")
                 file.write(f"适应度值：{global_best['SKDfit']}\n\n")
 
-        logging.info(f"第{it}代结果：{global_best['SKDfit']}")
+        logging.info(f"第{it + 1}代结果：{global_best['SKDfit']}")
 
     # 记录总运行时间
     total_time = time.time() - start_time

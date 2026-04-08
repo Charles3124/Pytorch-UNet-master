@@ -27,7 +27,7 @@ from decoders import Decoder, DecoderMixed
 from evaluate import evaluate
 from unet import UNet3, UNet5, UNet7, UNet9
 from utils.data_loading import Custom_dataset
-from utils.dice_score import dice_loss
+from utils.dice_score import dice_loss, focal_loss, tversky_loss, boundary_loss
 from npz_preprocess import RandomGenerator
 
 
@@ -99,9 +99,9 @@ def testFunction(params_list: List[np.ndarray], lr_pop=None, use_attention: bool
 
         logging.info(
             f"Network:\n"
-            f"\t\t{model.n_channels} input channels\n"
-            f"\t\t{model.n_classes} output channels (classes)\n"
-            f"\t\t{'Bilinear' if model.bilinear else 'Transposed conv'} upscaling"
+            f"\t\t{hparams['n_channels']} input channels\n"
+            f"\t\t{hparams['n_classes']} output channels (classes)\n"
+            f"\t\t{'Bilinear' if hparams['bilinear'] else 'Transposed conv'} upscaling"
         )
 
         try:
@@ -152,6 +152,8 @@ def train_model(
 ) -> float:
     """使用指定超参数训练 U-Net 模型，并返回 1 - dice 作为适应度值"""
     # 提取超参数
+    n_channels = hparams["n_channels"]
+    n_classes = hparams["n_classes"]
     blocks_number = hparams["blocks_number"]
     filter_number = hparams["filter_number"]
     filter_size = hparams["filter_size"]
@@ -163,6 +165,9 @@ def train_model(
     use_batchnorm = hparams["use_batchnorm"]
     use_dropout = hparams["use_dropout"]
     use_attention = hparams["use_attention"]
+    attention_F_int = hparams["attention_F_int"]
+    attention_activation = hparams["attention_activation"]
+    attention_fusion = hparams["attention_fusion"]
 
     # 1. 创建数据集
     try:
@@ -205,6 +210,9 @@ def train_model(
         Use Batchnorm:   {use_batchnorm}
         Use Dropout:     {use_dropout}
         Use Attention:   {use_attention}
+        attention_F_int:        {attention_F_int}
+        attention_activation:   {attention_activation}
+        attention_fusion:       {attention_fusion}
         Training Size:   {n_train}
         Validation Size: {n_val}
         Checkpoints:     {save_checkpoint}
@@ -214,16 +222,8 @@ def train_model(
     """)
 
     # 4. 设置优化器、损失函数、学习率调度器以及 AMP 的损失缩放
-    if optimizer_type == "SGD":
-        optimizer = optim.SGD(
-            model.parameters(), lr=learning_rate, weight_decay=weight_decay,
-            momentum=momentum, nesterov=True
-        )
-    elif optimizer_type == "RMSprop":
-        optimizer = optim.RMSprop(
-            model.parameters(), lr=learning_rate, weight_decay=weight_decay,
-            momentum=momentum
-        )
+    if optimizer_type == "RMSprop":
+        optimizer = optim.RMSprop(model.parameters(), lr=learning_rate, weight_decay=weight_decay, momentum=momentum)
     elif optimizer_type == "Adam":
         optimizer = optim.Adam(model.parameters(), lr=learning_rate, weight_decay=weight_decay)
     elif optimizer_type == "Adamax":
@@ -234,7 +234,12 @@ def train_model(
         raise ValueError(f"Unsupported optimizer type: {optimizer_type}")
 
     grad_scaler = torch.cuda.amp.GradScaler(enabled=amp)
-    criterion = nn.CrossEntropyLoss() if model.n_classes > 1 else nn.BCEWithLogitsLoss()
+
+    if n_classes > 1:
+        criterion = nn.CrossEntropyLoss()
+    else:
+        criterion = nn.BCEWithLogitsLoss()
+
     global_step = 0
 
     # 5. 开始训练
@@ -250,28 +255,27 @@ def train_model(
             for batch in train_loader:
                 images, true_masks = batch["image"], batch["label"]
 
-                assert images.shape[1] == model.n_channels, (
-                    f"Network has been defined with {model.n_channels} input channels, "
+                assert images.shape[1] == n_channels, (
+                    f"Network has been defined with {n_channels} input channels, "
                     f"but loaded image have {images.shape[1]} channels. Please check that "
                     f"the image are loaded correctly. "
                 )
 
                 images = images.to(device=device, dtype=torch.float32, memory_format=torch.channels_last)
-                # true_masks = true_masks.to(device=device, dtype=torch.long)
                 true_masks = true_masks.to(device=device, dtype=torch.float32)
 
                 # 自动混合精度训练 二元交叉熵 dice 混合
                 with torch.autocast(device.type if device.type != "mps" else "cpu", enabled=amp):
                     masks_pred = model(images)
 
-                    if model.n_classes == 1:
+                    if n_classes == 1:
                         loss = criterion(masks_pred.squeeze(1), true_masks.float())
                         loss += dice_loss(torch.sigmoid(masks_pred.squeeze(1)), true_masks.float(), multiclass=False)
                     else:
                         loss = criterion(masks_pred, true_masks)
                         loss += dice_loss(
                             F.softmax(masks_pred, dim=1).float(),
-                            F.one_hot(true_masks, model.n_classes).permute(0, 3, 1, 2).float(),
+                            F.one_hot(true_masks, n_classes).permute(0, 3, 1, 2).float(),
                             multiclass=True
                         )
 
@@ -285,7 +289,7 @@ def train_model(
                 grad_scaler.step(optimizer)
                 grad_scaler.update()
 
-                lr_ = learning_rate * (1.0 - iter_num / max_iterations)**0.9
+                lr_ = learning_rate * (1.0 - iter_num / max_iterations) ** 0.9
                 for param_group in optimizer.param_groups:
                     param_group["lr"] = lr_
                 iter_num = iter_num + 1
@@ -344,7 +348,10 @@ def train_model(
             "learning_rate": learning_rate,
             "use_batchnorm": use_batchnorm,
             "use_dropout": use_dropout,
-            "use_attention": use_attention
+            "use_attention": use_attention,
+            "attention_F_int": attention_F_int,
+            "attention_activation": attention_activation,
+            "attention_fusion": attention_fusion,
         }
 
         torch.save(checkpoint, save_path)

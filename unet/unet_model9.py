@@ -20,6 +20,15 @@ class UNet9(nn.Module):
         filter_number = hparams["filter_number"]
         bilinear = hparams["bilinear"]
 
+        # Attention F_int 映射
+        attention_F_int = hparams["attention_F_int"]
+        F_l_list = [filter_number * 8, filter_number * 4, filter_number * 2, filter_number]
+        F_int_list = []
+
+        for F_l in F_l_list:
+            F_int_options = [F_l, F_l // 2, F_l // 4, max(1, F_l // 8)]
+            F_int_list.append(F_int_options[attention_F_int])
+
         factor = 2 if bilinear else 1
 
         self.inc = DoubleConv(n_channels, filter_number, hparams)
@@ -30,19 +39,19 @@ class UNet9(nn.Module):
 
         self.up1 = Up(
             filter_number * 16, (filter_number * 8) // factor, hparams,
-            filter_number * 8, filter_number * 8, filter_number * 4
+            F_g=filter_number * 8, F_l=filter_number * 8, F_int=F_int_list[0]
         )
         self.up2 = Up(
             filter_number * 8, (filter_number * 4) // factor, hparams,
-            filter_number * 4, filter_number * 4, filter_number * 2
+            F_g=filter_number * 4, F_l=filter_number * 4, F_int=F_int_list[1]
         )
         self.up3 = Up(
             filter_number * 4, (filter_number * 2) // factor, hparams,
-            filter_number * 2, filter_number * 2, filter_number
+            F_g=filter_number * 2, F_l=filter_number * 2, F_int=F_int_list[2]
         )
         self.up4 = Up(
             filter_number * 2, filter_number, hparams,
-            filter_number, filter_number, filter_number // 2
+            F_g=filter_number, F_l=filter_number, F_int=F_int_list[3]
         )
         self.outc = OutConv(filter_number, n_classes)
 
