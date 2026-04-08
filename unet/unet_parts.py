@@ -6,7 +6,7 @@ unet_parts.py
 版本: 1.0
 """
 
-from typing import Optional, Callable
+from typing import Optional, Dict, Callable, Any
 
 import torch
 import torch.nn as nn
@@ -16,10 +16,17 @@ import torch.nn.functional as F
 class DoubleConv(nn.Module):
 
     def __init__(
-            self, in_channels: int, out_channels: int, filter_size: int, activation: int,
-            use_dropout: int, use_batchnorm: int, mid_channels: Optional[int] = None
+            self, in_channels: int, out_channels: int,
+            hparams: Dict[str, Any], mid_channels: Optional[int] = None
     ):
         super().__init__()
+
+        # 提取超参数
+        filter_size = hparams["filter_size"]
+        activation = hparams["activation"]
+        use_dropout = hparams["use_dropout"]
+        use_batchnorm = hparams["use_batchnorm"]
+
         if mid_channels is None:
             mid_channels = out_channels
 
@@ -79,20 +86,15 @@ class DoubleConv(nn.Module):
 class Down(nn.Module):
     """Downscaling with maxpool then double conv"""
 
-    def __init__(
-            self, in_channels: int, out_channels: int, filter_size: int, activation: int,
-            pooling: int, use_dropout: int, use_batchnorm: int
-    ):
+    def __init__(self, in_channels: int, out_channels: int, hparams: Dict[str, Any]):
         super().__init__()
-        if pooling == 0:
+
+        if hparams["pooling"] == 0:
             p = nn.MaxPool2d(kernel_size=2)
         else:
             p = nn.AvgPool2d(kernel_size=2)
 
-        self.maxpool_conv = nn.Sequential(p, DoubleConv(
-            in_channels, out_channels, filter_size, activation,
-            use_dropout, use_batchnorm
-        ))
+        self.maxpool_conv = nn.Sequential(p, DoubleConv(in_channels, out_channels, hparams))
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         return self.maxpool_conv(x)
@@ -102,29 +104,23 @@ class Up(nn.Module):
     """Upscaling then double conv"""
 
     def __init__(
-            self, in_channels: int, out_channels: int, filter_size: int, activation: int,
-            use_dropout: int, use_batchnorm: int, F_g: int, F_l: int, F_int: int,
-            bilinear: bool = True, use_attention: bool = False
+            self, in_channels: int, out_channels: int,
+            hparams: Dict[str, Any], F_g: int, F_l: int, F_int: int
     ):
         super().__init__()
+
         # if bilinear, use the normal convolutions to reduce the number of channels
-        if bilinear:
+        if hparams["bilinear"]:
             self.up = nn.Upsample(scale_factor=2, mode='bilinear', align_corners=True)
-            self.conv = DoubleConv(
-                in_channels, out_channels, filter_size, activation,
-                use_dropout, use_batchnorm, mid_channels=in_channels // 2
-            )
+            self.conv = DoubleConv(in_channels, out_channels, hparams, mid_channels=in_channels // 2)
         else:
             self.up = nn.ConvTranspose2d(in_channels, in_channels // 2, kernel_size=2, stride=2)
-            self.conv = DoubleConv(
-                in_channels, out_channels, filter_size, activation,
-                use_dropout, use_batchnorm
-            )
+            self.conv = DoubleConv(in_channels, out_channels, hparams)
 
         # Attention 模块
-        self.use_attention = use_attention
+        self.use_attention = hparams["use_attention"]
         if self.use_attention:
-            self.attention = AttentionBlock(F_g=F_g, F_l=F_l, F_int=F_int)
+            self.attention = AttentionBlock(hparams, F_g=F_g, F_l=F_l, F_int=F_int)
 
     def forward(self, x1: torch.Tensor, x2: torch.Tensor) -> torch.Tensor:
         # 上采样
@@ -196,7 +192,7 @@ class OutConv(nn.Module):
 
 class AttentionBlock(nn.Module):
 
-    def __init__(self, F_g: int, F_l: int, F_int: int):
+    def __init__(self, hparams: Dict[str, Any], F_g: int, F_l: int, F_int: int):
         super(AttentionBlock, self).__init__()
         self.W_g = nn.Sequential(
             nn.Conv2d(F_g, F_int, kernel_size=1, stride=1, padding=0, bias=True),
@@ -210,7 +206,6 @@ class AttentionBlock(nn.Module):
 
         self.psi = nn.Sequential(
             nn.Conv2d(F_int, out_channels=1, kernel_size=1, stride=1, padding=0, bias=True),
-            # nn.BatchNorm2d(1),
             nn.Sigmoid()
         )
 

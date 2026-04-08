@@ -4,6 +4,7 @@ decoders.py
 功能: 超参数解码器模块
 时间: 2026/03/26
 版本: 1.0
+备注: HLO 超参数解码器，封装为对象以简化程序，主程序 testFunction 可以调用解码器并解析出超参数，以下为参考形式
 """
 
 from typing import Tuple, Dict, Any, cast
@@ -12,7 +13,7 @@ import numpy as np
 
 
 class Decoder:
-    """超参数解码器"""
+    """HLOCE 超参数解码器"""
 
     @classmethod
     def decode(cls, binary_seq: np.ndarray) -> Dict[str, Any]:
@@ -129,7 +130,7 @@ class Decoder:
 
 
 class DecoderMixed:
-    """二进制+实数超参数解码器"""
+    """HLOCE + CHLOCE 超参数解码器"""
 
     @classmethod
     def decode(cls, binary_seq: np.ndarray) -> Dict[str, Any]:

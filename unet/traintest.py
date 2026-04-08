@@ -56,31 +56,17 @@ def clear_gpu_memory(model: nn.Module, optimizer: optim.Optimizer, loss: nn.Modu
     torch.cuda.synchronize()               # 同步 CUDA 流
 
 
-def UNet(
-        n_channels: int, n_classes: int, blocks_number: int, filter_number: int, filter_size: int,
-        activation: int, pooling: int, use_dropout: int, use_batchnorm: int, use_attention: bool
-) -> Optional[nn.Module]:
+def UNet(hparams: Dict[str, Any]) -> Optional[nn.Module]:
     """根据块数返回对应的 UNet 网络实例"""
+    blocks_number = hparams["blocks_number"]
     if blocks_number == 3:
-        return UNet3(
-            n_channels, n_classes, filter_number, filter_size, activation,
-            pooling, use_dropout, use_batchnorm, bilinear=False, use_attention=use_attention
-        )
+        return UNet3(hparams)
     if blocks_number == 5:
-        return UNet5(
-            n_channels, n_classes, filter_number, filter_size, activation,
-            pooling, use_dropout, use_batchnorm, bilinear=False, use_attention=use_attention
-        )
+        return UNet5(hparams)
     if blocks_number == 7:
-        return UNet7(
-            n_channels, n_classes, filter_number, filter_size, activation,
-            pooling, use_dropout, use_batchnorm, bilinear=False, use_attention=use_attention
-        )
+        return UNet7(hparams)
     if blocks_number == 9:
-        return UNet9(
-            n_channels, n_classes, filter_number, filter_size, activation,
-            pooling, use_dropout, use_batchnorm, bilinear=False, use_attention=use_attention
-        )
+        return UNet9(hparams)
 
     print("block number error")
     return None
@@ -92,18 +78,14 @@ def testFunction(params_list: List[np.ndarray], lr_pop=None, use_attention: bool
 
     for i, params in enumerate(params_list):
         # HLOCE + CHLOCE 超参数解码
-        if len(params) == 12:
-            hparams = DecoderMixed.decode(params)
-            hparams["learning_rate"] = lr_pop[i][0]
+        hparams = DecoderMixed.decode(params)
 
-        # HLOCE 超参数解码
-        else:
-            if len(params) == 22:
-                params = np.r_[1, 1, params]
-
-            hparams = Decoder.decode(params)
-
+        hparams["n_channels"] = 3
+        hparams["n_classes"] = 1
+        hparams["learning_rate"] = lr_pop[i][0]
         hparams["use_attention"] = use_attention
+        hparams["bilinear"] = False
+
         logging.info(f"二进制超参数解码结果: {hparams.values()}")
 
         device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -112,12 +94,7 @@ def testFunction(params_list: List[np.ndarray], lr_pop=None, use_attention: bool
         # Change here to adapt to your data
         # n_channels = 3 for RGB image
         # n_classes is the number of probabilities you want to get per pixel
-        model = UNet(
-            3, 1,
-            hparams["blocks_number"], hparams["filter_number"], hparams["filter_size"],
-            hparams["activation"], hparams["pooling"],
-            hparams["use_dropout"], hparams["use_batchnorm"], hparams["use_attention"]
-        )
+        model = UNet(hparams)
         model = model.to(device=device)
 
         logging.info(
