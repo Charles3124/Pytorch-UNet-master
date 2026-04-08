@@ -54,7 +54,7 @@ def HLOCE_v1_0(
         bit: int = 24,
         rl: int = 50
 ) -> Optional[list[Union[np.ndarray, np.int64]]]:
-    """HLOCE 调优 U-Net 超参数"""
+    """HLOCE 优化超参数"""
     # 记录程序开始时间
     start_time = time.time()
 
@@ -85,7 +85,7 @@ def HLOCE_v1_0(
     pi0 = 0.83     # 在 sum 为 0 时使用的 pi 数值
     ps0 = 0.64     # 在 sum 为 0 时使用的 ps 数值
 
-    # 创建文件，保存最优解及运行时间
+    # 创建输出文件
     output_file = "HLOCE_test_v1_0_results.txt"
     with open(output_file, "w") as file:
         file.write("HLOCE优化过程结果：\n")

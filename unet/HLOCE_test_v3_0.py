@@ -4,6 +4,7 @@ HLOCE_test_v3_0.py
 功能: 使用 HLOCE 对 U-Net 超参数调优
 时间: 2026/03/26
 版本: 3.0
+修改: 在 2.0 版本上增加了 CHLOCE 优化连续超参数
 """
 
 import os
@@ -23,8 +24,8 @@ logging.basicConfig(level=logging.INFO, format="%(levelname)s: %(message)s")
 class HLOCEOptimizer:
     """HLOCE 参数和迭代类"""
 
-    def __init__(self, popSize: int, bit: int):
-        self.popSize = popSize
+    def __init__(self, pop_size: int, bit: int):
+        self.pop_size = pop_size
         self.bit = bit
 
         # 伯努利参数初始化
@@ -33,9 +34,9 @@ class HLOCEOptimizer:
         # 基本参数
         self.a = 0.83    # 交叉熵参数
 
-        self.pr = np.zeros(popSize)  # 随机学习概率
-        self.pi = np.zeros(popSize)  # 个体学习概率
-        self.ps = np.zeros(popSize)  # 决定交叉熵学习还是社会学习
+        self.pr = np.zeros(pop_size)  # 随机学习概率
+        self.pi = np.zeros(pop_size)  # 个体学习概率
+        self.ps = np.zeros(pop_size)  # 决定交叉熵学习还是社会学习
 
         self.Kr, self.prMax = 2, 0.1                   # 计算 pr[i]
         self.K1, self.Ki, self.piMax = 0.83, 4, 0.92   # 计算 pi[i]
@@ -56,7 +57,7 @@ class HLOCEOptimizer:
         self.ber_params_before = ber_params_after.copy()
 
         # 更新种群
-        for i in range(self.popSize):
+        for i in range(self.pop_size):
             # 计算当前 i 对应的 pr[i], pi[i], ps[i]
             total = np.sum(np.abs(IKD[i] - SKD))
 
@@ -79,7 +80,7 @@ class HLOCEOptimizer:
                 else:
                     if prob2 < self.ps[i]:  # 交叉熵学习
                         popus[i][j] = 1 if np.random.rand() < ber_params_after[j] else 0
-                    else:              # 社会学习
+                    else:                   # 社会学习
                         popus[i][j] = SKD[j]
 
         return popus
@@ -101,8 +102,8 @@ class HLOCEOptimizer:
 class CHLOCEOptimizer:
     """CHLOCE 参数和迭代类"""
 
-    def __init__(self, popSize: int, dim: int, xMax: float, xMin: float):
-        self.popSize = popSize
+    def __init__(self, pop_size: int, dim: int, xMax: float, xMin: float):
+        self.pop_size = pop_size
         self.dim = dim
         self.xMax = xMax
         self.xMin = xMin
@@ -115,7 +116,7 @@ class CHLOCEOptimizer:
 
         self.K1, self.K2, self.K3 = 0.1, 0.8, 0.4
 
-        self.pi = np.zeros(self.popSize)
+        self.pi = np.zeros(self.pop_size)
 
         self.pr = 0.005
         self.K, self.Ki = 0.81, 0.2
@@ -129,7 +130,7 @@ class CHLOCEOptimizer:
     ) -> np.ndarray:
         """CHLOCE 迭代"""
         # 交叉熵高斯参数更新
-        gaussianParams = self._ce_gaussian(IKD, IKDfits, 5)
+        gaussianParams = self._ce_gaussian(IKD, IKDfits, 3)
         gaussianParams_after = []
 
         for j in range(self.dim):
@@ -148,29 +149,34 @@ class CHLOCEOptimizer:
         maxDifference[maxDifference < 1e-12] = 1e-12
 
         # 更新种群
-        for i in range(self.popSize):
+        for i in range(self.pop_size):
             normalized = diff[i] / maxDifference
             sum_diff = np.sqrt(np.sum(normalized ** 2))
 
             # 计算 pi[i]
-            self.pi[i] = self.pi0 if sum_diff == 0 else self.K + self.Ki * sum_diff / self.dim
+            if sum_diff == 0:
+                self.pi[i] = self.pi0
+            else:
+                self.pi[i] = self.K + self.Ki * sum_diff / self.dim
 
             # 更新种群每个维度
             for j in range(self.dim):
                 prob = np.random.rand()
-                if prob < self.pr:
+                if prob < self.pr:                     # 随机学习
                     popus[i][j] = self.xMin + np.random.rand() * (self.xMax - self.xMin)
-                elif prob < self.pi[i]:
+                elif prob < self.pi[i]:                # 个体学习
                     popus[i][j] = np.random.normal(IKD[i][j], self.K1 * abs(SKD[j] - IKD[i][j]))
                 else:
-                    if np.random.rand() < self.ps:
+                    if np.random.rand() < self.ps:     # 交叉熵学习
                         mean, std = gaussianParams_after[j]
                         popus[i][j] = np.random.normal(mean, std)
-                    else:
+                    else:                              # 社会学习
                         direction = SKD[j] - IKD[i][j]
                         sign = 1 if np.random.rand() < 0.5 else -1
-                        popus[i][j] = (sign * self.K2 * np.random.rand() * direction
-                                       + np.random.normal(SKD[j], self.K3 * abs(direction)))
+                        popus[i][j] = (
+                                sign * self.K2 * np.random.rand() * direction
+                                + np.random.normal(SKD[j], self.K3 * abs(direction))
+                        )
 
                 popus[i][j] = np.clip(popus[i][j], self.xMin, self.xMax)
 
@@ -192,36 +198,38 @@ class CHLOCEOptimizer:
 
 
 def HLOCE_v3_0(
-        maxIter: int = 10,
-        popSize: int = 10,
+        max_iter: int = 10,
+        pop_size: int = 10,
         bit: int = 12,
         lr_dim: int = 1,
         rl: int = 50,
         use_attention: bool = True
 ) -> Optional[list[Union[np.ndarray, np.int64]]]:
-    """HLOCE 调优 U-Net 超参数，学习率用 CHLOCE 优化"""
+    """HLOCE 优化二进制超参数，CHLOCE 优化学习率"""
+    # 记录程序开始时间
     start_time = time.time()
 
-    # 创建 HLOCE 优化器
-    HLOCE_optimiter = HLOCEOptimizer(popSize, bit)
+    # 创建 HLOCE 优化器，用于二进制超参数
+    HLOCE_optimiter = HLOCEOptimizer(pop_size, bit)
 
-    # 创建 CHLOCE 优化器，用于学习率 (10 维)
-    CHLOCE_optimiter = CHLOCEOptimizer(popSize, lr_dim, xMax=0.001, xMin=0.00001)
+    # 创建 CHLOCE 优化器，用于学习率
+    CHLOCE_optimiter = CHLOCEOptimizer(pop_size, lr_dim, xMax=0.001, xMin=0.00001)
 
+    # 创建输出文件
     output_file = f"HLOCE_test_v3_0_results_{'attention' if use_attention else 'baseline'}.txt"
     with open(output_file, "w") as file:
         file.write("HLOCE + CHLOCE 优化过程结果：\n")
 
     # 初始化 HLOCE 种群
     pop: dict[str, Any] = {
-        "popus": np.random.randint(0, 2, (popSize, bit)),
+        "popus": np.random.randint(0, 2, (pop_size, bit)),
         "fitness": None
     }
 
     # 初始化 CHLOCE 种群
-    lr_pop = np.random.uniform(CHLOCE_optimiter.xMin, CHLOCE_optimiter.xMax, (popSize, lr_dim))
+    lr_pop = np.random.uniform(CHLOCE_optimiter.xMin, CHLOCE_optimiter.xMax, (pop_size, lr_dim))
 
-    # 初始适应度
+    # 调用 testFunction，初始适应度
     pop["fitness"] = testFunction(pop["popus"], lr_pop, use_attention=use_attention)
     ind = np.argmin(pop["fitness"])
 
@@ -242,11 +250,11 @@ def HLOCE_v3_0(
     }
 
     # 初始化计数器
-    count = np.zeros(popSize)
+    count = np.zeros(pop_size)
     parameters = None
 
     # HLOCE + CHLOCE 迭代
-    for it in range(maxIter):
+    for it in range(max_iter):
         # HLOCE 更新二进制参数
         pop["popus"] = HLOCE_optimiter.update_population(
             pop["popus"], individual["IKD"], global_best["SKD"], individual["IKDfits"]
@@ -257,11 +265,11 @@ def HLOCE_v3_0(
             lr_pop, lr_individual["IKD"], global_best["lr_SKD"], individual["IKDfits"]
         )
 
-        # 更新适应度
+        # 调用 testFunction，更新适应度
         pop["fitness"] = testFunction(pop["popus"], lr_pop, use_attention=use_attention)
 
         # 更新个体最优
-        for i in range(popSize):
+        for i in range(pop_size):
             if pop["fitness"][i] < individual["IKDfits"][i]:
                 individual["IKDfits"][i] = pop["fitness"][i]
                 individual["IKD"][i] = pop["popus"][i].copy()
