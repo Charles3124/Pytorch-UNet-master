@@ -297,15 +297,26 @@ def HLOCE_v3_0(
             global_best["lr_SKD"] = lr_individual["IKD"][ind].copy()
 
             parameters = [
-                global_best["lr_SKD"],      # 学习率 [0.00001, 0.001]
+                # 网络结构参数
                 global_best["SKD"][0:2],    # 滤波器数量 4, 8, 16, 32
-                global_best["SKD"][2:4],    # 激活函数 ReLU, ELU, LeakyReLU, RReLU
-                global_best["SKD"][4],      # 池化层 MaxPool2d, AvgPool2d
-                global_best["SKD"][5:7],    # 优化器 Adamax, RMSprop, Adam, AdamW
-                global_best["SKD"][7:9],    # 批次大小 4, 8, 16, 32
-                global_best["SKD"][9],      # 批量归一化 使用，不使用
-                global_best["SKD"][10:12],  # dropout 不使用，Dropout，GaussianDropout
-                global_best["SKD"][12:14],  # 中间通道数 // 1, // 2, // 4, // 8
+
+                # 网络模块类型
+                global_best["SKD"][2:4],    # 激活函数类型 ReLU, ELU, LeakyReLU, RReLU
+                global_best["SKD"][4],      # 批量归一化 使用，不使用
+                global_best["SKD"][5],      # 池化层类型 MaxPool2d, AvgPool2d
+
+                # 训练超参数
+                global_best["lr_SKD"],      # 学习率 [0.00001, 0.001]
+                global_best["SKD"][6:8],    # 批量大小 4, 8, 16, 32
+
+                # 正则化参数
+                global_best["SKD"][8:10],   # 随机丢弃 不使用，Dropout，GaussianDropout
+
+                # 优化器参数
+                global_best["SKD"][10:12],  # 优化器类型 RMSprop, Adam, AdamW, Adamax
+
+                # Attention 模块参数
+                global_best["SKD"][12:14],  # 中间通道数 // 1, // 2, // 4
                 global_best["SKD"][14],     # 输出激活函数 Sigmoid, Hardsigmoid
                 global_best["SKD"][15],     # 融合方式 加法，拼接
             ]

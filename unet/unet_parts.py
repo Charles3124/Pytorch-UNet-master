@@ -14,6 +14,59 @@ import torch.nn.functional as F
 
 
 class DoubleConv(nn.Module):
+    def __init__(
+        self, in_channels: int, out_channels: int,
+        hparams: Dict[str, Any], mid_channels: Optional[int] = None
+    ):
+        super().__init__()
+
+        filter_size = hparams["filter_size"]
+        activation = hparams["activation"]
+        use_dropout = hparams["use_dropout"]
+        use_batchnorm = hparams["use_batchnorm"]
+
+        if mid_channels is None:
+            mid_channels = out_channels
+
+        padding = filter_size // 2
+
+        # 选择激活函数
+        if activation == 0:
+            act_layer = nn.ReLU(inplace=True)
+        elif activation == 1:
+            act_layer = nn.ELU(inplace=True)
+        elif activation == 2:
+            act_layer = nn.LeakyReLU(inplace=True)
+        else:
+            act_layer = nn.RReLU(inplace=True)
+
+        layers = []
+
+        # ---- Conv 1 ----
+        layers.append(nn.Conv2d(in_channels, mid_channels, kernel_size=filter_size, padding=padding, bias=False))
+        if use_batchnorm == 1:
+            layers.append(nn.BatchNorm2d(mid_channels))
+        layers.append(act_layer)
+
+        # ---- Conv 2 ----
+        layers.append(nn.Conv2d(mid_channels, out_channels, kernel_size=filter_size, padding=padding, bias=False))
+        if use_batchnorm == 1:
+            layers.append(nn.BatchNorm2d(out_channels))
+        layers.append(act_layer)
+
+        # ---- Dropout ----
+        if use_dropout == 2:
+            layers.append(nn.Dropout2d(p=0.3))
+        elif use_dropout == 3:
+            layers.append(GaussianDropout(p=0.3))
+
+        self.double_conv = nn.Sequential(*layers)
+
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
+        return self.double_conv(x)
+
+
+class DoubleConvOld(nn.Module):
 
     def __init__(
             self, in_channels: int, out_channels: int,
@@ -38,9 +91,11 @@ class DoubleConv(nn.Module):
         # 第一个卷积层
         layers.append(nn.Conv2d(in_channels, mid_channels, kernel_size=filter_size, padding=padding, bias=False))
 
+        # 批量归一化
         if use_batchnorm == 1:
             layers.append(nn.BatchNorm2d(mid_channels))
 
+        # 激活函数
         if activation == 0:
             layers.append(nn.ReLU(inplace=True))
         elif activation == 1:
@@ -50,6 +105,7 @@ class DoubleConv(nn.Module):
         else:
             layers.append(nn.RReLU(inplace=True))
 
+        # dropout
         if use_dropout == 2:
             layers.append(nn.Dropout(p=0.3))
         elif use_dropout == 3:
@@ -58,9 +114,11 @@ class DoubleConv(nn.Module):
         # 第二个卷积层
         layers.append(nn.Conv2d(mid_channels, out_channels, kernel_size=filter_size, padding=padding, bias=False))
 
+        # 批量归一化
         if use_batchnorm == 1:
             layers.append(nn.BatchNorm2d(out_channels))
 
+        # dropout
         if use_dropout == 2:
             layers.append(nn.Dropout(p=0.3))
         elif use_dropout == 3:
@@ -68,6 +126,7 @@ class DoubleConv(nn.Module):
 
         self.double_conv = nn.Sequential(*layers)
 
+        # 激活函数
         if activation == 0:
             self.act = nn.ReLU(inplace=True)
         elif activation == 1:
@@ -151,7 +210,7 @@ class GaussianDropout(nn.Module):
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         if self.training:
             stddev = (self.p / (1.0 - self.p)) ** 0.5
-            epsilon = torch.randn_like(x) * stddev
+            epsilon = torch.randn_like(x) * stddev + 1
             return x * epsilon
         return x
 

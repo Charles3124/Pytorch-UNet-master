@@ -137,17 +137,28 @@ class DecoderMixed:
         """解码二进制编码"""
         seq = cast(Tuple, tuple(binary_seq.tolist()))
         hparams = {
+            # 固定参数
             "blocks_number": 9,                                    # 块数
             "filter_size": 3,                                      # 卷积核大小
 
-            "filter_number": cls.decode_filter_number(seq[0:2]),   # 滤波器数量
-            "activation": cls.decode_activation(seq[2:4]),         # 激活函数类型
-            "pooling": seq[4],                                     # 池化层类型
-            "optimizer_type": cls.decode_optimizer(seq[5:7]),      # 优化器类型
-            "batch_size": cls.decode_batch_size(seq[7:9]),         # 批量大小
-            "use_batchnorm": seq[9],                               # 批归一化操作
-            "use_dropout": cls.decode_dropout(seq[10:12]),         # 随机丢弃操作
+            # 网络结构参数
+            "filters_number": cls.decode_filter_number(seq[0:2]),  # 滤波器数量
 
+            # 网络模块类型
+            "activation": cls.decode_activation(seq[2:4]),         # 激活函数类型
+            "use_batchnorm": seq[4],                               # 批归一化
+            "pooling": seq[5],                                     # 池化层类型
+
+            # 训练超参数
+            "batch_size": cls.decode_batch_size(seq[6:8]),         # 批量大小
+
+            # 正则化参数
+            "use_dropout": cls.decode_dropout(seq[8:10]),          # 随机丢弃
+
+            # 优化器参数
+            "optimizer_type": cls.decode_optimizer(seq[10:12]),    # 优化器类型
+
+            # Attention 模块参数
             "attention_F_int": cls.decode_attention_F_int(seq[12:14]),  # 中间通道数
             "attention_activation": seq[14],                            # 输出激活函数类型
             "attention_fusion": seq[15],                                # 融合方式
@@ -191,10 +202,10 @@ class DecoderMixed:
     def decode_optimizer(key: Tuple[int, int]) -> str:
         """解码优化器名称"""
         mapping = {
-            (0, 0): "Adamax",
-            (0, 1): "RMSprop",
-            (1, 0): "Adam",
-            (1, 1): "AdamW"
+            (0, 0): "RMSprop",
+            (0, 1): "Adam",
+            (1, 0): "AdamW",
+            (1, 1): "Adamax"
         }
         return mapping[key]
 

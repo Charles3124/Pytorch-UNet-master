@@ -6,6 +6,9 @@ traintest.py
 版本: 1.0
 """
 
+import sys
+sys.path.append("/home/xsuper/Pytorch-UNet-master")
+
 import os
 import gc
 import random
@@ -13,7 +16,6 @@ import logging
 from pathlib import Path
 from typing import Optional, List, Dict, Any
 
-import wandb
 from tqdm import tqdm
 import numpy as np
 import torch
@@ -23,18 +25,18 @@ from torch import optim
 from torch.utils.data import DataLoader
 from torchvision import transforms
 
-from decoders import Decoder, DecoderMixed
+from decoders import DecoderMixed
 from evaluate import evaluate
 from unet import UNet3, UNet5, UNet7, UNet9
 from utils.data_loading import Custom_dataset
-from utils.dice_score import dice_loss, focal_loss, tversky_loss, boundary_loss
+from utils.dice_score import dice_loss
 from npz_preprocess import RandomGenerator
 
 
 os.environ["KMP_DUPLICATE_LIB_OK"] = "True"
 logging.basicConfig(level=logging.INFO, format="%(levelname)s: %(message)s")
 
-ROOT_DIR = "D:"
+ROOT_DIR = "/home/xsuper"
 BASE_DIR = Path(f"{ROOT_DIR}/unet_data/dataset_split/npzgood")
 LIST_DIR = Path(f"{ROOT_DIR}/unet_data/dataset_split/dataset_split")
 
@@ -72,7 +74,7 @@ def UNet(hparams: Dict[str, Any]) -> Optional[nn.Module]:
     return None
 
 
-def testFunction(params_list: List[np.ndarray], lr_pop=None, use_attention: bool = False) -> List[float]:
+def testFunction(params_list: List[np.ndarray], lr_pop=None, use_attention: bool = True) -> List[float]:
     """根据参数列表训练模型，返回每组参数对应的损失值"""
     losses = []
 
@@ -82,9 +84,9 @@ def testFunction(params_list: List[np.ndarray], lr_pop=None, use_attention: bool
 
         hparams["n_channels"] = 3
         hparams["n_classes"] = 1
-        hparams["learning_rate"] = lr_pop[i][0]
         hparams["use_attention"] = use_attention
         hparams["bilinear"] = False
+        hparams["learning_rate"] = lr_pop[i][0]
 
         logging.info(f"二进制超参数解码结果: {hparams.values()}")
 
@@ -154,17 +156,25 @@ def train_model(
     # 提取超参数
     n_channels = hparams["n_channels"]
     n_classes = hparams["n_classes"]
-    blocks_number = hparams["blocks_number"]
-    filter_number = hparams["filter_number"]
-    filter_size = hparams["filter_size"]
-    activation = hparams["activation"]
-    pooling = hparams["pooling"]
-    optimizer_type = hparams["optimizer_type"]
-    batch_size = hparams["batch_size"]
-    learning_rate = hparams["learning_rate"]
-    use_batchnorm = hparams["use_batchnorm"]
-    use_dropout = hparams["use_dropout"]
     use_attention = hparams["use_attention"]
+    bilinear = hparams["bilinear"]
+    
+    blocks_number = hparams["blocks_number"]
+    filter_size = hparams["filter_size"]
+    
+    filters_number = hparams["filters_number"]
+    
+    activation = hparams["activation"]
+    use_batchnorm = hparams["use_batchnorm"]
+    pooling = hparams["pooling"]
+
+    learning_rate = hparams["learning_rate"]
+    batch_size = hparams["batch_size"]
+
+    use_dropout = hparams["use_dropout"]
+
+    optimizer_type = hparams["optimizer_type"]
+
     attention_F_int = hparams["attention_F_int"]
     attention_activation = hparams["attention_activation"]
     attention_fusion = hparams["attention_fusion"]
@@ -199,17 +209,18 @@ def train_model(
 
     logging.info(f"""Starting training:
         Epochs:          {epochs}
-        Blocks Number:   {blocks_number}
-        Filter Number:   {filter_number}
-        Filter Size:     {filter_size}
-        Activation:      {activation}
-        Pooling:         {pooling}
-        Optimizer Type:  {optimizer_type}
-        Batch Size:      {batch_size}
-        Learning Rate:   {learning_rate}
-        Use Batchnorm:   {use_batchnorm}
-        Use Dropout:     {use_dropout}
         Use Attention:   {use_attention}
+        Bilinear:        {bilinear}
+        Blocks Number:   {blocks_number}
+        Filter Size:     {filter_size}
+        Filters Number:  {filters_number}
+        Activation:      {activation}
+        Use Batchnorm:   {use_batchnorm}
+        Pooling:         {pooling}
+        Learning Rate:   {learning_rate}
+        Batch Size:      {batch_size}
+        Use Dropout:     {use_dropout}
+        Optimizer Type:  {optimizer_type}
         attention_F_int:        {attention_F_int}
         attention_activation:   {attention_activation}
         attention_fusion:       {attention_fusion}
@@ -299,14 +310,6 @@ def train_model(
                 epoch_loss += loss.item()
                 pbar.set_postfix(**{"loss (batch)": loss.item()})
 
-        histograms = {}
-        for tag, value in model.named_parameters():
-            tag = tag.replace("/", ".")
-            if not (torch.isinf(value) | torch.isnan(value)).any():
-                histograms["Weights/" + tag] = wandb.Histogram(value.data.cpu())
-            if not (torch.isinf(value.grad) | torch.isnan(value.grad)).any():
-                histograms["Gradients/" + tag] = wandb.Histogram(value.grad.data.cpu())
-
         # 验证阶段
         val_score = evaluate(model, val_loader, device, split="val")[0]
         logging.info(f"Validation Dice score: {val_score}")
@@ -338,17 +341,18 @@ def train_model(
             "model_name": model.__class__.__name__,
             "model_state": model.state_dict(),
             "params": params,
-            "blocks_number": blocks_number,
-            "filters_number": filter_number,
-            "filter_size": filter_size,
-            "activation": activation,
-            "pooling": pooling,
-            "optimizer_type": optimizer_type,
-            "batch_size": batch_size,
-            "learning_rate": learning_rate,
-            "use_batchnorm": use_batchnorm,
-            "use_dropout": use_dropout,
             "use_attention": use_attention,
+            "bilinear": bilinear,
+            "blocks_number": blocks_number,
+            "filter_size": filter_size,
+            "filters_number": filters_number,
+            "activation": activation,
+            "use_batchnorm": use_batchnorm,
+            "pooling": pooling,
+            "learning_rate": learning_rate,
+            "batch_size": batch_size,
+            "use_dropout": use_dropout,
+            "optimizer_type": optimizer_type,
             "attention_F_int": attention_F_int,
             "attention_activation": attention_activation,
             "attention_fusion": attention_fusion,

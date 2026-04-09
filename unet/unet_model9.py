@@ -17,43 +17,43 @@ class UNet9(nn.Module):
         # 提取超参数
         n_channels = hparams["n_channels"]
         n_classes = hparams["n_classes"]
-        filter_number = hparams["filter_number"]
+        filters_number = hparams["filters_number"]
         bilinear = hparams["bilinear"]
 
         # Attention F_int 映射
         attention_F_int = hparams["attention_F_int"]
-        F_l_list = [filter_number * 8, filter_number * 4, filter_number * 2, filter_number]
+        F_l_list = [filters_number * 8, filters_number * 4, filters_number * 2, filters_number]
         F_int_list = []
 
         for F_l in F_l_list:
-            F_int_options = [F_l, F_l // 2, F_l // 4, max(1, F_l // 8)]
+            F_int_options = [F_l, F_l // 2, F_l // 2, F_l // 4]
             F_int_list.append(F_int_options[attention_F_int])
 
         factor = 2 if bilinear else 1
 
-        self.inc = DoubleConv(n_channels, filter_number, hparams)
-        self.down1 = Down(filter_number, filter_number * 2, hparams)
-        self.down2 = Down(filter_number * 2, filter_number * 4, hparams)
-        self.down3 = Down(filter_number * 4, filter_number * 8, hparams)
-        self.down4 = Down(filter_number * 8, (filter_number * 16) // factor, hparams)
+        self.inc = DoubleConv(n_channels, filters_number, hparams)
+        self.down1 = Down(filters_number, filters_number * 2, hparams)
+        self.down2 = Down(filters_number * 2, filters_number * 4, hparams)
+        self.down3 = Down(filters_number * 4, filters_number * 8, hparams)
+        self.down4 = Down(filters_number * 8, (filters_number * 16) // factor, hparams)
 
         self.up1 = Up(
-            filter_number * 16, (filter_number * 8) // factor, hparams,
-            F_g=filter_number * 8, F_l=filter_number * 8, F_int=F_int_list[0]
+            filters_number * 16, (filters_number * 8) // factor, hparams,
+            F_g=filters_number * 8, F_l=filters_number * 8, F_int=F_int_list[0]
         )
         self.up2 = Up(
-            filter_number * 8, (filter_number * 4) // factor, hparams,
-            F_g=filter_number * 4, F_l=filter_number * 4, F_int=F_int_list[1]
+            filters_number * 8, (filters_number * 4) // factor, hparams,
+            F_g=filters_number * 4, F_l=filters_number * 4, F_int=F_int_list[1]
         )
         self.up3 = Up(
-            filter_number * 4, (filter_number * 2) // factor, hparams,
-            F_g=filter_number * 2, F_l=filter_number * 2, F_int=F_int_list[2]
+            filters_number * 4, (filters_number * 2) // factor, hparams,
+            F_g=filters_number * 2, F_l=filters_number * 2, F_int=F_int_list[2]
         )
         self.up4 = Up(
-            filter_number * 2, filter_number, hparams,
-            F_g=filter_number, F_l=filter_number, F_int=F_int_list[3]
+            filters_number * 2, filters_number, hparams,
+            F_g=filters_number, F_l=filters_number, F_int=F_int_list[3]
         )
-        self.outc = OutConv(filter_number, n_classes)
+        self.outc = OutConv(filters_number, n_classes)
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         x1 = self.inc(x)

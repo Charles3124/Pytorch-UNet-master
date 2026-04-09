@@ -25,30 +25,27 @@ def test_model(saved_models: str, test_save_dir: Optional[str] = None, split: st
 
     # 加载模型，提取超参数
     checkpoint = torch.load(saved_models, map_location=device)
-    params = {
-        "learning_rate": checkpoint["learning_rate"],
+    hparams = {
+        "n_channels": 3,
+        "n_classes": 1,
+        "use_attention": checkpoint["use_attention"],
+        "bilinear": checkpoint["bilinear"],
         "blocks_number": checkpoint["blocks_number"],
-        "filters_number": checkpoint["filters_number"],
         "filter_size": checkpoint["filter_size"],
+        "filters_number": checkpoint["filters_number"],
         "activation": checkpoint["activation"],
-        "pooling": checkpoint["pooling"],
-        "use_dropout": checkpoint["use_dropout"],
         "use_batchnorm": checkpoint["use_batchnorm"],
-        "use_attention": checkpoint["use_attention"]
+        "pooling": checkpoint["pooling"],
+        "learning_rate": checkpoint["learning_rate"],
+        "batch_size": checkpoint["batch_size"],
+        "use_dropout": checkpoint["use_dropout"],
+        "optimizer_type": checkpoint["optimizer_type"],
+        "attention_F_int": checkpoint["attention_F_int"],
+        "attention_activation": checkpoint["attention_activation"],
+        "attention_fusion": checkpoint["attention_fusion"],
     }
 
-    model = UNet(
-        n_channels=3,
-        n_classes=1,
-        blocks_number=params["blocks_number"],
-        filter_number=params["filters_number"],
-        filter_size=params["filter_size"],
-        activation=params["activation"],
-        pooling=params["pooling"],
-        use_dropout=params["use_dropout"],
-        use_batchnorm=params["use_batchnorm"],
-        use_attention=params["use_attention"]
-    )
+    model = UNet(hparams)
 
     model.load_state_dict(checkpoint["model_state"])
     model = model.to(device)
@@ -59,7 +56,7 @@ def test_model(saved_models: str, test_save_dir: Optional[str] = None, split: st
     test_results = evaluate(model, testloader, device, split, test_save_path=test_save_dir)
     torch.cuda.empty_cache()
 
-    return params, test_results
+    return hparams, test_results
 
 
 # 批量测试模型
@@ -87,7 +84,7 @@ if __name__ == "__main__":
         logging.info(f"[{i}/{len(model_files)}] 测试模型: {model_name}")
 
         # 调用测试函数
-        params, (mean_dice, std_dice, iou, iou_std) = test_model(saved_models=str(model_path))
+        hparams, (mean_dice, std_dice, iou, iou_std) = test_model(saved_models=str(model_path))
 
         # 保存结果
         result = {
@@ -96,15 +93,21 @@ if __name__ == "__main__":
             "std_dice": std_dice,
             "mean_iou": iou,
             "std_iou": iou_std,
-            "learning_rate": params["learning_rate"],
-            "blocks_number": params["blocks_number"],
-            "filter_number": params["filters_number"],
-            "filter_size": params["filter_size"],
-            "activation": params["activation"],
-            "pooling": params["pooling"],
-            "use_dropout": params["use_dropout"],
-            "use_batchnorm": params["use_batchnorm"],
-            "use_attention": params["use_attention"]
+            "use_attention": hparams["use_attention"],
+            "bilinear": hparams["bilinear"],
+            "blocks_number": hparams["blocks_number"],
+            "filter_size": hparams["filter_size"],
+            "filters_number": hparams["filters_number"],
+            "activation": hparams["activation"],
+            "use_batchnorm": hparams["use_batchnorm"],
+            "pooling": hparams["pooling"],
+            "learning_rate": hparams["learning_rate"],
+            "batch_size": hparams["batch_size"],
+            "use_dropout": hparams["use_dropout"],
+            "optimizer_type": hparams["optimizer_type"],
+            "attention_F_int": hparams["attention_F_int"],
+            "attention_activation": hparams["attention_activation"],
+            "attention_fusion": hparams["attention_fusion"],
         }
         results_list.append(result)
 
