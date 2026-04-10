@@ -21,13 +21,9 @@ class UNet9(nn.Module):
         bilinear = hparams["bilinear"]
 
         # Attention F_int 映射
-        attention_F_int = hparams["attention_F_int"]
+        attention_ratio = hparams["attention_ratio"]
         F_l_list = [filters_number * 8, filters_number * 4, filters_number * 2, filters_number]
-        F_int_list = []
-
-        for F_l in F_l_list:
-            F_int_options = [F_l, F_l // 2, F_l // 2, F_l // 4]
-            F_int_list.append(F_int_options[attention_F_int])
+        F_int_list = [max(round(F_l * attention_ratio), 1) for F_l in F_l_list]
 
         factor = 2 if bilinear else 1
 

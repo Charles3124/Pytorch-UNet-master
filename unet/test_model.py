@@ -24,7 +24,7 @@ def test_model(saved_models: str, test_save_dir: Optional[str] = None, split: st
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
     # 加载模型，提取超参数
-    checkpoint = torch.load(saved_models, map_location=device)
+    checkpoint = torch.load(saved_models, map_location=device, weights_only=False)
     hparams = {
         "n_channels": 3,
         "n_classes": 1,
@@ -40,7 +40,7 @@ def test_model(saved_models: str, test_save_dir: Optional[str] = None, split: st
         "batch_size": checkpoint["batch_size"],
         "use_dropout": checkpoint["use_dropout"],
         "optimizer_type": checkpoint["optimizer_type"],
-        "attention_F_int": checkpoint["attention_F_int"],
+        "attention_ratio": checkpoint["attention_ratio"],
         "attention_activation": checkpoint["attention_activation"],
         "attention_fusion": checkpoint["attention_fusion"],
     }
@@ -105,7 +105,7 @@ if __name__ == "__main__":
             "batch_size": hparams["batch_size"],
             "use_dropout": hparams["use_dropout"],
             "optimizer_type": hparams["optimizer_type"],
-            "attention_F_int": hparams["attention_F_int"],
+            "attention_ratio": hparams["attention_ratio"],
             "attention_activation": hparams["attention_activation"],
             "attention_fusion": hparams["attention_fusion"],
         }

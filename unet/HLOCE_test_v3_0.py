@@ -10,7 +10,7 @@ HLOCE_test_v3_0.py
 import os
 import time
 import logging
-from typing import Optional, List, Any, Union
+from typing import Optional, Any, Union
 
 import numpy as np
 
@@ -27,6 +27,7 @@ class HLOCEOptimizer:
     def __init__(self, pop_size: int, bit: int):
         self.pop_size = pop_size
         self.bit = bit
+        self.ne = int(self.pop_size * 0.18)
 
         # 伯努利参数初始化
         self.ber_params_before = self._initialize_multinoulli_parameters(bit)
@@ -46,11 +47,11 @@ class HLOCEOptimizer:
 
     def update_population(
             self, popus: np.ndarray, IKD: np.ndarray,
-            SKD: np.ndarray, IKDfits: np.ndarray
+            SKD: np.ndarray, IKD_fits: np.ndarray
     ) -> np.ndarray:
         """HLOCE 迭代"""
         # 计算交叉熵概率
-        ber_params = self._ce_prob(IKDfits, IKD, 3)
+        ber_params = self._ce_prob(IKD_fits, IKD, self.ne)
 
         # 平滑更新概率参数
         ber_params_after = self.a * ber_params + (1 - self.a) * self.ber_params_before
@@ -91,9 +92,9 @@ class HLOCEOptimizer:
         return np.random.rand(m)
 
     @staticmethod
-    def _ce_prob(IKDfits: np.ndarray, IKD: np.ndarray, Ne: int) -> np.ndarray:
+    def _ce_prob(IKD_fits: np.ndarray, IKD: np.ndarray, ne: int) -> np.ndarray:
         """使用多元伯努利分布计算交叉熵概率"""
-        indices = np.argpartition(IKDfits, Ne)[:Ne]        # 找到适应度最小的 Ne 个个体索引
+        indices = np.argpartition(IKD_fits, ne)[:ne]       # 找到适应度最小的 ne 个个体索引
         elite_population = IKD[indices]                    # 提取精英个体
         probabilities = np.mean(elite_population, axis=0)  # 计算每个基因位点为 1 的概率
         return probabilities
@@ -102,11 +103,12 @@ class HLOCEOptimizer:
 class CHLOCEOptimizer:
     """CHLOCE 参数和迭代类"""
 
-    def __init__(self, pop_size: int, dim: int, xMax: float, xMin: float):
+    def __init__(self, pop_size: int, dim: int, params_min: np.array, params_max: np.array):
         self.pop_size = pop_size
         self.dim = dim
-        self.xMax = xMax
-        self.xMin = xMin
+        self.ne = int(self.pop_size * 0.22)
+        self.params_min = params_min
+        self.params_max = params_max
 
         # 高斯参数初始化
         self.gaussian_params_before = self._initialize_gaussian_parameters(dim)
@@ -126,22 +128,22 @@ class CHLOCEOptimizer:
 
     def update_population(
             self, popus: np.ndarray, IKD: np.ndarray,
-            SKD: np.ndarray, IKDfits: np.ndarray
+            SKD: np.ndarray, IKD_fits: np.ndarray
     ) -> np.ndarray:
         """CHLOCE 迭代"""
         # 交叉熵高斯参数更新
-        gaussianParams = self._ce_gaussian(IKD, IKDfits, 3)
-        gaussianParams_after = []
+        gaussian_params = self._ce_gaussian(IKD, IKD_fits, self.ne)
+        gaussian_params_after = []
 
         for j in range(self.dim):
-            current = gaussianParams[j]
+            current = gaussian_params[j]
             previous = self.gaussian_params_before[j]
 
             mean = self.a * current[0] + (1 - self.a) * previous[0]
             std = self.a * current[1] + (1 - self.a) * previous[1]
-            gaussianParams_after.append([mean, std])
+            gaussian_params_after.append([mean, std])
 
-        self.gaussian_params_before = [gp.copy() for gp in gaussianParams_after]
+        self.gaussian_params_before = [gp.copy() for gp in gaussian_params_after]
 
         # 计算差异度
         diff = np.abs(IKD - SKD)
@@ -163,12 +165,12 @@ class CHLOCEOptimizer:
             for j in range(self.dim):
                 prob = np.random.rand()
                 if prob < self.pr:                     # 随机学习
-                    popus[i][j] = self.xMin + np.random.rand() * (self.xMax - self.xMin)
+                    popus[i][j] = self.params_min[j] + np.random.rand() * (self.params_max[j] - self.params_min[j])
                 elif prob < self.pi[i]:                # 个体学习
                     popus[i][j] = np.random.normal(IKD[i][j], self.K1 * abs(SKD[j] - IKD[i][j]))
                 else:
                     if np.random.rand() < self.ps:     # 交叉熵学习
-                        mean, std = gaussianParams_after[j]
+                        mean, std = gaussian_params_after[j]
                         popus[i][j] = np.random.normal(mean, std)
                     else:                              # 社会学习
                         direction = SKD[j] - IKD[i][j]
@@ -178,19 +180,19 @@ class CHLOCEOptimizer:
                                 + np.random.normal(SKD[j], self.K3 * abs(direction))
                         )
 
-                popus[i][j] = np.clip(popus[i][j], self.xMin, self.xMax)
+                popus[i][j] = np.clip(popus[i][j], self.params_min[j], self.params_max[j])
 
         return popus
 
     @staticmethod
-    def _initialize_gaussian_parameters(dim: int) -> List[List[float]]:
+    def _initialize_gaussian_parameters(dim: int) -> list[list[float]]:
         """初始化高斯参数"""
         return [[np.random.rand(), np.random.rand()] for _ in range(dim)]
 
     @staticmethod
-    def _ce_gaussian(IKD: np.ndarray, IKDfits: np.ndarray, Ne: int) -> List[List[float]]:
+    def _ce_gaussian(IKD: np.ndarray, IKD_fits: np.ndarray, ne: int) -> list[list[float]]:
         """计算交叉熵高斯参数"""
-        indices = np.argpartition(IKDfits, Ne)[:Ne]
+        indices = np.argpartition(IKD_fits, ne)[:ne]
         elite = IKD[indices]
         mean = np.mean(elite, axis=0)
         std = np.std(elite, axis=0)
@@ -198,10 +200,10 @@ class CHLOCEOptimizer:
 
 
 def HLOCE_v3_0(
-        max_iter: int = 10,
-        pop_size: int = 10,
-        bit: int = 16,
-        lr_dim: int = 1,
+        max_iter: int = 20,
+        pop_size: int = 20,
+        bit: int = 14,
+        dim: int = 2,
         rl: int = 50,
         use_attention: bool = True
 ) -> Optional[list[Union[np.ndarray, np.int64]]]:
@@ -213,120 +215,133 @@ def HLOCE_v3_0(
     HLOCE_optimiter = HLOCEOptimizer(pop_size, bit)
 
     # 创建 CHLOCE 优化器，用于学习率
-    CHLOCE_optimiter = CHLOCEOptimizer(pop_size, lr_dim, xMax=0.001, xMin=0.00001)
+    learning_rate_min = 1e-5
+    learning_rate_max = 1e-3
+    attention_ratio_min = 0.125
+    attention_ratio_max = 1.0
+    params_min = np.array([learning_rate_min, attention_ratio_min])
+    params_max = np.array([learning_rate_max, attention_ratio_max])
+
+    CHLOCE_optimiter = CHLOCEOptimizer(pop_size, dim, params_min, params_max)
 
     # 创建输出文件
     output_file = f"HLOCE_test_v3_0_results_{'attention' if use_attention else 'baseline'}.txt"
     with open(output_file, "w") as file:
         file.write("HLOCE + CHLOCE 优化过程结果：\n")
 
-    # 初始化 HLOCE 种群
+    # 种群初始化
+    # HLOCE 负责二进制种群，CHLOCE 负责实数种群
+    # testFunction 对二进制 + 实数种群共同评价，HLOCE 和 CHLOCE 共用适应度值 fitness
+    # IKD 含义是个体的历史最优值，SKD 含义是种群的全局最优值
+
+    # 初始化 HLOCE 和 CHLOCE 种群
     pop: dict[str, Any] = {
-        "popus": np.random.randint(0, 2, (pop_size, bit)),
-        "fitness": None
+        "HLOCE_pop": np.random.randint(0, 2, (pop_size, bit)),
+        "CHLOCE_pop": params_min + np.random.rand(pop_size, dim) * (params_max - params_min),
+        "fitness": None,
     }
+    
+    # 调用 testFunction，初始化适应度
+    pop["fitness"] = testFunction(pop["HLOCE_pop"], pop["CHLOCE_pop"], use_attention=use_attention)
 
-    # 初始化 CHLOCE 种群
-    lr_pop = np.random.uniform(CHLOCE_optimiter.xMin, CHLOCE_optimiter.xMax, (pop_size, lr_dim))
-
-    # 调用 testFunction，初始适应度
-    pop["fitness"] = testFunction(pop["popus"], lr_pop, use_attention=use_attention)
+    # 最优个体索引
     ind = np.argmin(pop["fitness"])
 
-    # 初始化局部最优
+    # 初始化个体最优
     individual: dict[str, Any] = {
-        "IKD": pop["popus"].copy(),
-        "IKDfits": pop["fitness"].copy()
-    }
-    lr_individual: dict[str, Any] = {
-        "IKD": lr_pop.copy()
+        "HLOCE_IKD": pop["HLOCE_pop"].copy(),
+        "CHLOCE_IKD": pop["CHLOCE_pop"].copy(),
+        "IKD_fits": pop["fitness"].copy(),
     }
 
     # 初始化全局最优
     global_best: dict[str, Any] = {
-        "SKD": pop["popus"][ind].copy(),
-        "SKDfit": pop["fitness"][ind],
-        "lr_SKD": lr_pop[ind].copy()
+        "HLOCE_SKD": pop["HLOCE_pop"][ind].copy(),
+        "CHLOCE_SKD": pop["CHLOCE_pop"][ind].copy(),
+        "SKD_fit": pop["fitness"][ind],
     }
 
     # 初始化计数器
     count = np.zeros(pop_size)
-    parameters = None
 
     # HLOCE + CHLOCE 迭代
+    parameters = None
     for it in range(max_iter):
         # HLOCE 更新二进制参数
-        pop["popus"] = HLOCE_optimiter.update_population(
-            pop["popus"], individual["IKD"], global_best["SKD"], individual["IKDfits"]
+        pop["HLOCE_pop"] = HLOCE_optimiter.update_population(
+            pop["HLOCE_pop"], individual["HLOCE_IKD"], global_best["HLOCE_SKD"], individual["IKD_fits"]
         )
 
         # CHLOCE 更新学习率
-        lr_pop = CHLOCE_optimiter.update_population(
-            lr_pop, lr_individual["IKD"], global_best["lr_SKD"], individual["IKDfits"]
+        pop["CHLOCE_pop"] = CHLOCE_optimiter.update_population(
+            pop["CHLOCE_pop"], individual["CHLOCE_IKD"], global_best["CHLOCE_SKD"], individual["IKD_fits"]
         )
 
         # 调用 testFunction，更新适应度
-        pop["fitness"] = testFunction(pop["popus"], lr_pop, use_attention=use_attention)
+        pop["fitness"] = testFunction(pop["HLOCE_pop"], pop["CHLOCE_pop"], use_attention=use_attention)
 
         # 更新个体最优
         for i in range(pop_size):
-            if pop["fitness"][i] < individual["IKDfits"][i]:
-                individual["IKDfits"][i] = pop["fitness"][i]
-                individual["IKD"][i] = pop["popus"][i].copy()
-                lr_individual["IKD"][i] = lr_pop[i].copy()
+            if pop["fitness"][i] < individual["IKD_fits"][i]:
+                individual["HLOCE_IKD"][i] = pop["HLOCE_pop"][i].copy()
+                individual["CHLOCE_IKD"][i] = pop["CHLOCE_pop"][i].copy()
+                individual["IKD_fits"][i] = pop["fitness"][i]
                 count[i] = 0
             else:
                 count[i] += 1
 
             # 重新初始化
             if count[i] == rl:
-                individual["IKD"][i] = np.random.randint(0, 2, bit)
-                lr_individual["IKD"][i] = np.random.uniform(CHLOCE_optimiter.xMin, CHLOCE_optimiter.xMax, lr_dim)
-                individual["IKDfits"][i] = testFunction(
-                    params_list=[individual["IKD"][i]],
-                    lr_pop=[lr_individual["IKD"][i]],
+                individual["HLOCE_IKD"][i] = np.random.randint(0, 2, bit)
+                individual["CHLOCE_IKD"][i] = np.array([
+                    np.random.uniform(1e-5, 1e-3),
+                    np.random.uniform(0.125, 1.0)
+                ])
+                individual["IKD_fits"][i] = testFunction(
+                    params_list=[individual["HLOCE_IKD"][i]],
+                    CHLOCE_pop=[individual["CHLOCE_IKD"][i]],
                     use_attention=use_attention
                 )[0]
                 count[i] = 0
 
         # 寻找全局最优
-        ind = np.argmin(individual["IKDfits"])
-        if individual["IKDfits"][ind] < global_best["SKDfit"]:
-            global_best["SKDfit"] = individual["IKDfits"][ind]
-            global_best["SKD"] = individual["IKD"][ind].copy()
-            global_best["lr_SKD"] = lr_individual["IKD"][ind].copy()
+        ind = np.argmin(individual["IKD_fits"])
+        if individual["IKD_fits"][ind] < global_best["SKD_fit"]:
+            global_best["HLOCE_SKD"] = individual["HLOCE_IKD"][ind].copy()
+            global_best["CHLOCE_SKD"] = individual["CHLOCE_IKD"][ind].copy()
+            global_best["SKD_fit"] = individual["IKD_fits"][ind]
 
             parameters = [
                 # 网络结构参数
-                global_best["SKD"][0:2],    # 滤波器数量 4, 8, 16, 32
+                global_best["HLOCE_SKD"][0:2],    # 滤波器数量 4, 8, 16, 32
 
                 # 网络模块类型
-                global_best["SKD"][2:4],    # 激活函数类型 ReLU, ELU, LeakyReLU, RReLU
-                global_best["SKD"][4],      # 批量归一化 使用，不使用
-                global_best["SKD"][5],      # 池化层类型 MaxPool2d, AvgPool2d
+                global_best["HLOCE_SKD"][2:4],    # 激活函数类型 ReLU, ELU, LeakyReLU, RReLU
+                global_best["HLOCE_SKD"][4],      # 批量归一化 使用，不使用
+                global_best["HLOCE_SKD"][5],      # 池化层类型 MaxPool2d, AvgPool2d
 
                 # 训练超参数
-                global_best["lr_SKD"],      # 学习率 [0.00001, 0.001]
-                global_best["SKD"][6:8],    # 批量大小 4, 8, 16, 32
+                global_best["CHLOCE_SKD"][0],     # 学习率 [0.00001, 0.001]
+                global_best["HLOCE_SKD"][6:8],    # 批量大小 4, 8, 16, 32
 
                 # 正则化参数
-                global_best["SKD"][8:10],   # 随机丢弃 不使用，Dropout，GaussianDropout
+                global_best["HLOCE_SKD"][8:10],   # 随机丢弃 不使用，Dropout，GaussianDropout
 
                 # 优化器参数
-                global_best["SKD"][10:12],  # 优化器类型 RMSprop, Adam, AdamW, Adamax
+                global_best["HLOCE_SKD"][10:12],  # 优化器类型 RMSprop, Adam, AdamW, Adamax
 
                 # Attention 模块参数
-                global_best["SKD"][12:14],  # 中间通道数 // 1, // 2, // 4
-                global_best["SKD"][14],     # 输出激活函数 Sigmoid, Hardsigmoid
-                global_best["SKD"][15],     # 融合方式 加法，拼接
+                global_best["CHLOCE_SKD"][1],     # 中间通道数 [0.125, 1.0]
+                global_best["HLOCE_SKD"][12],     # 输出激活函数 Sigmoid, Hardsigmoid
+                global_best["HLOCE_SKD"][13],     # 融合方式 加法，拼接
             ]
 
             with open(output_file, "a") as file:
                 file.write(f"第{it + 1}代：\n")
                 file.write(f"参数：{parameters}\n")
-                file.write(f"适应度值：{global_best['SKDfit']}\n\n")
+                file.write(f"适应度值：{global_best['SKD_fit']}\n\n")
 
-        logging.info(f"第{it + 1}代结果：{global_best['SKDfit']}")
+        logging.info(f"第{it + 1}代结果：{global_best['SKD_fit']}")
 
     # 记录总运行时间
     total_time = time.time() - start_time

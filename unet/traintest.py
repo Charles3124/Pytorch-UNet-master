@@ -74,7 +74,7 @@ def UNet(hparams: Dict[str, Any]) -> Optional[nn.Module]:
     return None
 
 
-def testFunction(params_list: List[np.ndarray], lr_pop=None, use_attention: bool = True) -> List[float]:
+def testFunction(params_list: List[np.ndarray], CHLOCE_pop=None, use_attention: bool = True) -> List[float]:
     """根据参数列表训练模型，返回每组参数对应的损失值"""
     losses = []
 
@@ -86,7 +86,8 @@ def testFunction(params_list: List[np.ndarray], lr_pop=None, use_attention: bool
         hparams["n_classes"] = 1
         hparams["use_attention"] = use_attention
         hparams["bilinear"] = False
-        hparams["learning_rate"] = lr_pop[i][0]
+        hparams["learning_rate"] = CHLOCE_pop[i][0]
+        hparams["attention_ratio"] = CHLOCE_pop[i][1]
 
         logging.info(f"二进制超参数解码结果: {hparams.values()}")
 
@@ -175,7 +176,7 @@ def train_model(
 
     optimizer_type = hparams["optimizer_type"]
 
-    attention_F_int = hparams["attention_F_int"]
+    attention_ratio = hparams["attention_ratio"]
     attention_activation = hparams["attention_activation"]
     attention_fusion = hparams["attention_fusion"]
 
@@ -221,9 +222,9 @@ def train_model(
         Batch Size:      {batch_size}
         Use Dropout:     {use_dropout}
         Optimizer Type:  {optimizer_type}
-        attention_F_int:        {attention_F_int}
-        attention_activation:   {attention_activation}
-        attention_fusion:       {attention_fusion}
+        Attention Ratio:        {attention_ratio}
+        Attention Activation:   {attention_activation}
+        Attention Fusion:       {attention_fusion}
         Training Size:   {n_train}
         Validation Size: {n_val}
         Checkpoints:     {save_checkpoint}
@@ -353,7 +354,7 @@ def train_model(
             "batch_size": batch_size,
             "use_dropout": use_dropout,
             "optimizer_type": optimizer_type,
-            "attention_F_int": attention_F_int,
+            "attention_ratio": attention_ratio,
             "attention_activation": attention_activation,
             "attention_fusion": attention_fusion,
         }

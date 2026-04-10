@@ -159,9 +159,8 @@ class DecoderMixed:
             "optimizer_type": cls.decode_optimizer(seq[10:12]),    # 优化器类型
 
             # Attention 模块参数
-            "attention_F_int": cls.decode_attention_F_int(seq[12:14]),  # 中间通道数
-            "attention_activation": seq[14],                            # 输出激活函数类型
-            "attention_fusion": seq[15],                                # 融合方式
+            "attention_activation": seq[12],                       # 输出激活函数类型
+            "attention_fusion": seq[13],                           # 融合方式
         }
         return hparams
 
@@ -230,14 +229,3 @@ class DecoderMixed:
             (1, 1): 3
         }
         return mapping.get(key)
-
-    @staticmethod
-    def decode_attention_F_int(key: Tuple[int, int]) -> int:
-        """解码 Attention 中间通道数索引"""
-        mapping = {
-            (0, 0): 0,
-            (0, 1): 1,
-            (1, 0): 2,
-            (1, 1): 3
-        }
-        return mapping[key]
