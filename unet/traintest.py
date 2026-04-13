@@ -74,11 +74,15 @@ def UNet(hparams: Dict[str, Any]) -> Optional[nn.Module]:
     return None
 
 
-def testFunction(params_list: List[np.ndarray], CHLOCE_pop=None, use_attention: bool = True) -> List[float]:
+def testFunction(
+        HLOCE_pop: List[np.ndarray],
+        CHLOCE_pop: Optional[List[np.ndarray]] = None,
+        use_attention: bool = True
+) -> List[float]:
     """根据参数列表训练模型，返回每组参数对应的损失值"""
     losses = []
 
-    for i, params in enumerate(params_list):
+    for i, params in enumerate(HLOCE_pop):
         # HLOCE + CHLOCE 超参数解码
         hparams = DecoderMixed.decode(params)
 

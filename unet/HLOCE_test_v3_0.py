@@ -242,7 +242,11 @@ def HLOCE_v3_0(
     }
     
     # 调用 testFunction，初始化适应度
-    pop["fitness"] = testFunction(pop["HLOCE_pop"], pop["CHLOCE_pop"], use_attention=use_attention)
+    pop["fitness"] = testFunction(
+        HLOCE_pop=pop["HLOCE_pop"],
+        CHLOCE_pop=pop["CHLOCE_pop"],
+        use_attention=use_attention
+    )
 
     # 最优个体索引
     ind = np.argmin(pop["fitness"])
@@ -278,7 +282,11 @@ def HLOCE_v3_0(
         )
 
         # 调用 testFunction，更新适应度
-        pop["fitness"] = testFunction(pop["HLOCE_pop"], pop["CHLOCE_pop"], use_attention=use_attention)
+        pop["fitness"] = testFunction(
+            HLOCE_pop=pop["HLOCE_pop"],
+            CHLOCE_pop=pop["CHLOCE_pop"],
+            use_attention=use_attention
+        )
 
         # 更新个体最优
         for i in range(pop_size):
@@ -294,11 +302,11 @@ def HLOCE_v3_0(
             if count[i] == rl:
                 individual["HLOCE_IKD"][i] = np.random.randint(0, 2, bit)
                 individual["CHLOCE_IKD"][i] = np.array([
-                    np.random.uniform(1e-5, 1e-3),
-                    np.random.uniform(0.125, 1.0)
+                    np.random.uniform(learning_rate_min, learning_rate_max),
+                    np.random.uniform(attention_ratio_min, attention_ratio_max)
                 ])
                 individual["IKD_fits"][i] = testFunction(
-                    params_list=[individual["HLOCE_IKD"][i]],
+                    HLOCE_pop=[individual["HLOCE_IKD"][i]],
                     CHLOCE_pop=[individual["CHLOCE_IKD"][i]],
                     use_attention=use_attention
                 )[0]
