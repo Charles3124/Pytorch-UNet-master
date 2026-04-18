@@ -183,6 +183,7 @@ def train_model(
     attention_ratio = hparams["attention_ratio"]
     attention_activation = hparams["attention_activation"]
     attention_fusion = hparams["attention_fusion"]
+    attention_depth = hparams["attention_depth"]
 
     # 1. 创建数据集
     try:
@@ -226,9 +227,10 @@ def train_model(
         Batch Size:      {batch_size}
         Use Dropout:     {use_dropout}
         Optimizer Type:  {optimizer_type}
-        Attention Ratio:        {attention_ratio}
-        Attention Activation:   {attention_activation}
-        Attention Fusion:       {attention_fusion}
+        Attention Ratio:       {attention_ratio}
+        Attention Activation:  {attention_activation}
+        Attention Fusion:      {attention_fusion}
+        Attention Depth:       {attention_depth}
         Training Size:   {n_train}
         Validation Size: {n_val}
         Checkpoints:     {save_checkpoint}
@@ -361,6 +363,7 @@ def train_model(
             "attention_ratio": attention_ratio,
             "attention_activation": attention_activation,
             "attention_fusion": attention_fusion,
+            "attention_depth": attention_depth,
         }
 
         torch.save(checkpoint, save_path)

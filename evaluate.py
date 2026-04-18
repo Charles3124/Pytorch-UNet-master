@@ -21,8 +21,8 @@ from utils.utils import test_single_volume
 def evaluate(
     net: torch.nn.Module, dataloader: DataLoader,
     device: torch.device, split: str, test_save_path: Optional[str] = None
-) -> tuple[float, float, float, float]:
-    """对整个数据集进行推理并计算平均 Dice 指标"""
+) -> tuple[float, float, float, float, float, float, float, float, float, float]:
+    """对数据集进行推理并计算指标"""
     amp = False
     net.eval()
 
@@ -51,16 +51,14 @@ def evaluate(
                 (i, mean_metrics[i][0], std_metrics[i][0], mean_metrics[i][1], std_metrics[i][1])
             )
 
-        # 假设关注第一个类别（根据实际情况调整索引）
-        performance = mean_metrics[0][0]
-        performance_std = std_metrics[0][0]
-        iou = mean_metrics[0][1]
-        iou_std = std_metrics[0][1]
+        # 第一个类别
+        dice, iou, acc, rec, pre = mean_metrics[0]
+        dice_std, iou_std, acc_std, rec_std, pre_std = std_metrics[0]
 
         logging.info(
             "%s performance in best val model: mean_dice: %f ± %f, iou: %f ± %f" %
-            (mode, performance, performance_std, iou, iou_std)
+            (mode, dice, dice_std, iou, iou_std)
         )
 
     net.train()
-    return performance, performance_std, iou, iou_std
+    return dice, dice_std, iou, iou_std, acc, acc_std, rec, rec_std, pre, pre_std

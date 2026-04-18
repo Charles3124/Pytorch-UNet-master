@@ -24,10 +24,10 @@ logging.basicConfig(level=logging.INFO, format="%(levelname)s: %(message)s")
 class HLOCEOptimizer:
     """HLOCE 参数和迭代类"""
 
-    def __init__(self, pop_size: int, bit: int):
+    def __init__(self, pop_size: int, bit: int, ne_ratio: float = 0.18):
         self.pop_size = pop_size
         self.bit = bit
-        self.ne = int(self.pop_size * 0.18)
+        self.ne = int(self.pop_size * ne_ratio)
 
         # 伯努利参数初始化
         self.ber_params_before = self._initialize_multinoulli_parameters(bit)
@@ -40,10 +40,10 @@ class HLOCEOptimizer:
         self.ps = np.zeros(pop_size)  # 决定交叉熵学习还是社会学习
 
         self.Kr, self.prMax = 2, 0.1                   # 计算 pr[i]
-        self.K1, self.Ki, self.piMax = 0.83, 4, 0.92   # 计算 pi[i]
-        self.K2, self.Ks, self.psMax = 0.82, 3, 0.87   # 计算 ps[i]
+        self.K1, self.Ki, self.piMax = 0.86, 4, 0.90   # 计算 pi[i]
+        self.K2, self.Ks, self.psMax = 0.24, 6, 0.32   # 计算 ps[i]
 
-        self.pr0, self.pi0, self.ps0 = 0.005, 0.88, 0.50  # sum 为 0 时的取值
+        self.pr0, self.pi0, self.ps0 = 0.005, 0.80, 0.88  # sum 为 0 时的取值
 
     def update_population(
             self, popus: np.ndarray, IKD: np.ndarray,
@@ -103,10 +103,14 @@ class HLOCEOptimizer:
 class CHLOCEOptimizer:
     """CHLOCE 参数和迭代类"""
 
-    def __init__(self, pop_size: int, dim: int, params_min: np.array, params_max: np.array):
+    def __init__(
+            self, pop_size: int, dim: int,
+            params_min: np.array, params_max: np.array,
+            ne_ratio: float = 0.22
+    ):
         self.pop_size = pop_size
         self.dim = dim
-        self.ne = int(self.pop_size * 0.22)
+        self.ne = int(self.pop_size * ne_ratio)
         self.params_min = params_min
         self.params_max = params_max
 
@@ -118,13 +122,14 @@ class CHLOCEOptimizer:
 
         self.K1, self.K2, self.K3 = 0.1, 0.8, 0.4
 
-        self.pi = np.zeros(self.pop_size)
-
         self.pr = 0.005
-        self.K, self.Ki = 0.81, 0.2
-        self.ps = 0.64
+        self.pi = np.zeros(self.pop_size)
+        self.ps = np.zeros(self.pop_size)
 
-        self.pi0 = 0.8
+        self.K1, self.Ki = 0.84, 0.20
+        self.K2, self.Ks = 0.70, 0.19
+
+        self.pi0, self.ps0 = 0.80, 0.71
 
     def update_population(
             self, popus: np.ndarray, IKD: np.ndarray,
@@ -158,8 +163,10 @@ class CHLOCEOptimizer:
             # 计算 pi[i]
             if sum_diff == 0:
                 self.pi[i] = self.pi0
+                self.ps[i] = self.ps0
             else:
-                self.pi[i] = self.K + self.Ki * sum_diff / self.dim
+                self.pi[i] = self.K1 + self.Ki * sum_diff / self.dim
+                self.ps[i] = self.K2 + self.Ks * sum_diff / self.dim
 
             # 更新种群每个维度
             for j in range(self.dim):
@@ -169,7 +176,7 @@ class CHLOCEOptimizer:
                 elif prob < self.pi[i]:                # 个体学习
                     popus[i][j] = np.random.normal(IKD[i][j], self.K1 * abs(SKD[j] - IKD[i][j]))
                 else:
-                    if np.random.rand() < self.ps:     # 交叉熵学习
+                    if np.random.rand() < self.ps[i]:  # 交叉熵学习
                         mean, std = gaussian_params_after[j]
                         popus[i][j] = np.random.normal(mean, std)
                     else:                              # 社会学习
@@ -202,7 +209,7 @@ class CHLOCEOptimizer:
 def HLOCE_v3_0(
         max_iter: int = 20,
         pop_size: int = 20,
-        bit: int = 14,
+        bit: int = 16,
         dim: int = 2,
         rl: int = 50,
         use_attention: bool = True
@@ -342,6 +349,7 @@ def HLOCE_v3_0(
                 global_best["CHLOCE_SKD"][1],     # 中间通道数 [0.125, 1.0]
                 global_best["HLOCE_SKD"][12],     # 输出激活函数 Sigmoid, Hardsigmoid
                 global_best["HLOCE_SKD"][13],     # 融合方式 加法，拼接
+                global_best["HLOCE_SKD"][14:16],  # Attention 启用深度
             ]
 
             with open(output_file, "a") as file:

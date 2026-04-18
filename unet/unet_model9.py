@@ -19,6 +19,7 @@ class UNet9(nn.Module):
         n_classes = hparams["n_classes"]
         filters_number = hparams["filters_number"]
         bilinear = hparams["bilinear"]
+        attention_depth = hparams["attention_depth"]
 
         # Attention F_int 映射
         attention_ratio = hparams["attention_ratio"]
@@ -35,19 +36,23 @@ class UNet9(nn.Module):
 
         self.up1 = Up(
             filters_number * 16, (filters_number * 8) // factor, hparams,
-            F_g=filters_number * 8, F_l=filters_number * 8, F_int=F_int_list[0]
+            F_g=filters_number * 8, F_l=filters_number * 8, F_int=F_int_list[0],
+            use_attention_depth=attention_depth >= 0
         )
         self.up2 = Up(
             filters_number * 8, (filters_number * 4) // factor, hparams,
-            F_g=filters_number * 4, F_l=filters_number * 4, F_int=F_int_list[1]
+            F_g=filters_number * 4, F_l=filters_number * 4, F_int=F_int_list[1],
+            use_attention_depth=attention_depth >= 1
         )
         self.up3 = Up(
             filters_number * 4, (filters_number * 2) // factor, hparams,
-            F_g=filters_number * 2, F_l=filters_number * 2, F_int=F_int_list[2]
+            F_g=filters_number * 2, F_l=filters_number * 2, F_int=F_int_list[2],
+            use_attention_depth=attention_depth >= 2
         )
         self.up4 = Up(
             filters_number * 2, filters_number, hparams,
-            F_g=filters_number, F_l=filters_number, F_int=F_int_list[3]
+            F_g=filters_number, F_l=filters_number, F_int=F_int_list[3],
+            use_attention_depth=attention_depth >= 3
         )
         self.outc = OutConv(filters_number, n_classes)
 

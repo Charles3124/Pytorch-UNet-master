@@ -42,19 +42,19 @@ class DoubleConv(nn.Module):
 
         layers = []
 
-        # ---- Conv 1 ----
+        # ----- Conv 1 -----
         layers.append(nn.Conv2d(in_channels, mid_channels, kernel_size=filter_size, padding=padding, bias=False))
         if use_batchnorm == 1:
             layers.append(nn.BatchNorm2d(mid_channels))
         layers.append(act_layer)
 
-        # ---- Conv 2 ----
+        # ----- Conv 2 -----
         layers.append(nn.Conv2d(mid_channels, out_channels, kernel_size=filter_size, padding=padding, bias=False))
         if use_batchnorm == 1:
             layers.append(nn.BatchNorm2d(out_channels))
         layers.append(act_layer)
 
-        # ---- Dropout ----
+        # ----- Dropout -----
         if use_dropout == 2:
             layers.append(nn.Dropout2d(p=0.3))
         elif use_dropout == 3:
@@ -164,7 +164,8 @@ class Up(nn.Module):
 
     def __init__(
             self, in_channels: int, out_channels: int,
-            hparams: Dict[str, Any], F_g: int, F_l: int, F_int: int
+            hparams: Dict[str, Any], F_g: int, F_l: int, F_int: int,
+            use_attention_depth: bool = True
     ):
         super().__init__()
 
@@ -177,7 +178,7 @@ class Up(nn.Module):
             self.conv = DoubleConv(in_channels, out_channels, hparams)
 
         # Attention 模块
-        self.use_attention = hparams["use_attention"]
+        self.use_attention = hparams["use_attention"] and use_attention_depth
         if self.use_attention:
             self.attention = AttentionBlock(hparams, F_g=F_g, F_l=F_l, F_int=F_int)
 

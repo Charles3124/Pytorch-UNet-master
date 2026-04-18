@@ -45,6 +45,11 @@ def test_model(saved_models: str, test_save_dir: Optional[str] = None, split: st
         "attention_fusion": checkpoint["attention_fusion"],
     }
 
+    if "attention_depth" in checkpoint:
+        hparams["attention_depth"] = checkpoint["attention_depth"]
+    else:
+        hparams["attention_depth"] = 3
+
     model = UNet(hparams)
 
     model.load_state_dict(checkpoint["model_state"])
@@ -52,8 +57,8 @@ def test_model(saved_models: str, test_save_dir: Optional[str] = None, split: st
 
     # 对训练完的模型进行测试
     db_test = Custom_dataset(BASE_DIR, LIST_DIR, split=split)
-    testloader = DataLoader(db_test, batch_size=1, shuffle=False, num_workers=1)
-    test_results = evaluate(model, testloader, device, split, test_save_path=test_save_dir)
+    test_loader = DataLoader(db_test, batch_size=1, shuffle=False, num_workers=1)
+    test_results = evaluate(model, test_loader, device, split, test_save_path=test_save_dir)
     torch.cuda.empty_cache()
 
     return hparams, test_results
@@ -84,15 +89,23 @@ if __name__ == "__main__":
         logging.info(f"[{i}/{len(model_files)}] 测试模型: {model_name}")
 
         # 调用测试函数
-        hparams, (mean_dice, std_dice, iou, iou_std) = test_model(saved_models=str(model_path))
+        hparams, (
+            dice, dice_std, iou, iou_std, acc, acc_std, rec, rec_std, pre, pre_std
+        ) = test_model(saved_models=str(model_path))
 
         # 保存结果
         result = {
             "model_name": model_name,
-            "mean_dice": mean_dice,
-            "std_dice": std_dice,
+            "dice": dice,
+            "dice_std": dice_std,
             "mean_iou": iou,
             "std_iou": iou_std,
+            "acc": acc,
+            "acc_std": acc_std,
+            "rec": rec,
+            "rec_std": rec_std,
+            "pre": pre,
+            "pre_std": pre_std,
             "use_attention": hparams["use_attention"],
             "bilinear": hparams["bilinear"],
             "blocks_number": hparams["blocks_number"],
@@ -108,6 +121,7 @@ if __name__ == "__main__":
             "attention_ratio": hparams["attention_ratio"],
             "attention_activation": hparams["attention_activation"],
             "attention_fusion": hparams["attention_fusion"],
+            "attention_depth": hparams["attention_depth"],
         }
         results_list.append(result)
 

@@ -160,6 +160,7 @@ class DecoderMixed:
             # Attention 模块参数
             "attention_activation": seq[12],                       # 输出激活函数类型
             "attention_fusion": seq[13],                           # 融合方式
+            "attention_depth": cls.decode_attention_up(seq[14:16]),   # Attention 启用深度
         }
         return hparams
 
@@ -167,10 +168,10 @@ class DecoderMixed:
     def decode_filter_number(key: Tuple[int, int]) -> int:
         """解码滤波器数量"""
         mapping = {
-            (0, 0): 4,
-            (0, 1): 8,
-            (1, 0): 16,
-            (1, 1): 32
+            (0, 0): 64,
+            (0, 1): 64,
+            (1, 0): 64,
+            (1, 1): 64
         }
         return mapping[key]
 
@@ -221,6 +222,17 @@ class DecoderMixed:
     @staticmethod
     def decode_dropout(key: Tuple[int, int]) -> int:
         """解码 dropout 类型索引"""
+        mapping = {
+            (0, 0): 0,
+            (0, 1): 1,
+            (1, 0): 2,
+            (1, 1): 3
+        }
+        return mapping.get(key)
+
+    @staticmethod
+    def decode_attention_up(key: Tuple[int, int]) -> int:
+        """解码上采样模块索引"""
         mapping = {
             (0, 0): 0,
             (0, 1): 1,
