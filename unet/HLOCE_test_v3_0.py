@@ -206,6 +206,49 @@ class CHLOCEOptimizer:
         return [[m, s] for m, s in zip(mean, std)]
 
 
+def inject_elite(
+        pop: dict[str, Any], params_min: np.array, params_max: np.array,
+        p_group: float = 0.3, p_continuous: float = 0.3, noise_scale: float = 0.1
+):
+    """对种群分组弱注入"""
+    HLOCE_pop = pop["HLOCE_pop"]
+    CHLOCE_pop = pop["CHLOCE_pop"]
+
+    # 定义分组
+    GROUPS = [
+        (0, 2), (2, 4), (4, 5), (5, 6), (6, 8),
+        (8, 10), (10, 12), (12, 13), (13, 14), (14, 16)
+    ]
+
+    # 已知较优解
+    bests = [
+        [[0, 1, 0, 0, 1, 0, 0, 0, 0, 0, 1, 1, 0, 1, 0, 0], 0.000488530549843934, 0.173184281737075],
+        [[1, 1, 0, 0, 1, 0, 0, 1, 0, 0, 0, 1, 1, 0, 1, 1], 0.000891289678469333, 0.125],
+        [[0, 1, 1, 0, 1, 0, 0, 1, 0, 1, 1, 1, 0, 1, 0, 1], 0.000735976281786814, 0.818180014141213],
+        [[0, 1, 1, 0, 1, 1, 0, 0, 1, 1, 1, 1, 0, 1, 1, 1], 0.00063910915385259, 0.28301895677865],
+    ]
+
+    bests_bin = np.array([item[0] for item in bests])
+    bests_continuous = np.array([[item[1], item[2]] for item in bests])
+
+    for i in range(len(bests)):
+        best_bin, best_cont = bests_bin[i], bests_continuous[i]
+
+        # HLOCE 分组注入
+        for l, r in GROUPS:
+            if np.random.rand() < p_group:
+                HLOCE_pop[i, l:r] = best_bin[l:r]
+
+        # CHLOCE 连续注入
+        if np.random.rand() < p_continuous:
+            noise = noise_scale * (np.random.rand(2) - 0.5)
+            scale = params_max - params_min
+            CHLOCE_pop[i] = best_cont + noise * scale
+            CHLOCE_pop[i] = np.clip(CHLOCE_pop[i], params_min, params_max)
+
+    return pop
+
+
 def HLOCE_v3_0(
         max_iter: int = 20,
         pop_size: int = 20,
@@ -247,7 +290,9 @@ def HLOCE_v3_0(
         "CHLOCE_pop": params_min + np.random.rand(pop_size, dim) * (params_max - params_min),
         "fitness": None,
     }
-    
+
+    pop = inject_elite(pop, params_min, params_max)
+
     # 调用 testFunction，初始化适应度
     pop["fitness"] = testFunction(
         HLOCE_pop=pop["HLOCE_pop"],
