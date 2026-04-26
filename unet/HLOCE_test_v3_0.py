@@ -40,7 +40,7 @@ class HLOCEOptimizer:
         self.ps = np.zeros(pop_size)  # 决定交叉熵学习还是社会学习
 
         self.Kr, self.prMax = 2, 0.1                   # 计算 pr[i]
-        self.K1, self.Ki, self.piMax = 0.86, 4, 0.90   # 计算 pi[i]
+        self.K1, self.Ki, self.piMax = 0.83, 5, 0.90   # 计算 pi[i]
         self.K2, self.Ks, self.psMax = 0.24, 6, 0.32   # 计算 ps[i]
 
         self.pr0, self.pi0, self.ps0 = 0.005, 0.80, 0.88  # sum 为 0 时的取值
@@ -65,11 +65,11 @@ class HLOCEOptimizer:
             if total == 0:     # total 为 0 时，使用基本 HLO 的 pr 和 pi
                 self.pr[i] = self.pr0
                 self.pi[i] = self.pi0
-                self.ps[i] = self.ps0
+                # self.ps[i] = self.ps0
             else:              # total 不为 0 时，使用有效信息的计算方法
                 self.pr[i] = min(self.Kr / total, self.prMax)             # 控制 pr[i] 的上限
                 self.pi[i] = min(self.K1 + self.Ki / total, self.piMax)   # 控制 pi[i] 的上限
-                self.ps[i] = min(self.K2 + self.Ks / total, self.psMax)   # 控制 ps[i] 的上限
+                # self.ps[i] = min(self.K2 + self.Ks / total, self.psMax)   # 控制 ps[i] 的上限
 
             for j in range(self.bit):
                 prob1 = np.random.uniform()
@@ -79,7 +79,7 @@ class HLOCEOptimizer:
                 elif prob1 < self.pi[i]:    # 个体学习
                     popus[i][j] = IKD[i][j]
                 else:
-                    if prob2 < self.ps[i]:  # 交叉熵学习
+                    if prob2 < 0.64:  # 交叉熵学习
                         popus[i][j] = 1 if np.random.rand() < ber_params_after[j] else 0
                     else:                   # 社会学习
                         popus[i][j] = SKD[j]

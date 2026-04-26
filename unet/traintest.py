@@ -263,8 +263,11 @@ def train_model(
     # 5. 开始训练
     iter_num = 0
     max_iterations = epochs * len(train_loader)
-    low_accuracy_count = 0
-    val_score = 0
+
+    best_score = float("-inf")
+    best_model_state = None
+    no_improve_count = 0
+    patience = 10
 
     for epoch in range(1, epochs + 1):
         model.train()
@@ -321,25 +324,29 @@ def train_model(
         val_score = evaluate(model, val_loader, device, split="val")[0]
         logging.info(f"Validation Dice score: {val_score}")
 
-        if epoch >= 20:
-            if val_score < 0.65:         # 如果准确率低于 0.65，增加计数器
-                low_accuracy_count += 1
-            else:                        # 如果准确率高于 0.65，重置计数器
-                low_accuracy_count = 0
+        # 更新 best model
+        if val_score > best_score:
+            best_score = val_score
+            best_model_state = {k: v.clone() for k, v in model.state_dict().items()}
+            no_improve_count = 0
+        else:
+            no_improve_count += 1
 
-            if low_accuracy_count >= 3:  # 如果连续三轮都低于 0.65，跳出循环
-                logging.info(f"Stopping early at epoch {epoch} due to low accuracy. ")
-                break
+        # 基于 patience 的早停
+        if no_improve_count >= patience:
+            logging.info(f"Early stopping at epoch {epoch} (no improvement for {patience} epochs)")
+            break
 
-    # 保存分割效果较好的模型
-    if val_score >= 0.88:
+    # 保存最优模型
+    if best_model_state is not None and best_score >= 0.80:
         save_dir = "good_model"
         if not os.path.exists(save_dir):
             os.makedirs(save_dir)
 
         # 保存模型
+        model.load_state_dict(best_model_state)
         model_name = (
-            f"model_dice_{val_score:.4f},params_[{','.join(map(str, params))}]_"
+            f"model_dice_{best_score:.4f},params_[{','.join(map(str, params))}]_"
             f"{'attention' if use_attention else 'baseline'}.pth"
         )
         save_path = os.path.join(save_dir, model_name)
@@ -367,10 +374,10 @@ def train_model(
         }
 
         torch.save(checkpoint, save_path)
-        print(f"Model has saved, val_sccore = {val_score}, params = {params}")
+        print(f"Model has saved, best_sccore = {best_score}, params = {params}")
 
     clear_gpu_memory(model, optimizer, criterion)
-    return 1 - val_score
+    return 1 - best_score
 
 
 # 测试模型（旧版）
