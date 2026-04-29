@@ -14,7 +14,7 @@ import torch
 import pandas as pd
 from torch.utils.data import DataLoader
 
-from traintest import UNet, ROOT_DIR, BASE_DIR, LIST_DIR
+from traintest import UNet, ROOT_DIR, PROJECT_DIR, BASE_DIR, LIST_DIR
 from evaluate import evaluate
 from utils.data_loading import Custom_dataset
 
@@ -67,8 +67,8 @@ def test_model(saved_models: str, test_save_dir: Optional[str] = None, split: st
 # 批量测试模型
 if __name__ == "__main__":
     # 配置参数
-    models_dir = f"{ROOT_DIR}/Pytorch-UNet-master/good_model/"
-    excel_save_path = f"{ROOT_DIR}/Pytorch-UNet-master/model_test_results.xlsx"
+    models_dir = f"{ROOT_DIR}/{PROJECT_DIR}/checkpoints/"
+    excel_save_path = f"{ROOT_DIR}/{PROJECT_DIR}/model_test_results.xlsx"
 
     # 日志配置
     logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
@@ -149,7 +149,7 @@ if __name__ == "__main__":
 
 # 测试模型
 # if __name__ == "__main__":
-#     base_path = f"{ROOT_DIR}/Pytorch-UNet-master/good_model/"
+#     base_path = f"{ROOT_DIR}/{PROJECT_DIR}/checkpoints/"
 #     saved_models = os.path.join(
 #         base_path,
 #         "model_dice_0.8857,params_[1,1,1,1,0,0,0,0,0,0,1,0,1,0,1,0,0,1,1,1,0,1,0,1]-attention.pth"

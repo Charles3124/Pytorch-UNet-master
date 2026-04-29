@@ -37,6 +37,7 @@ os.environ["KMP_DUPLICATE_LIB_OK"] = "True"
 logging.basicConfig(level=logging.INFO, format="%(levelname)s: %(message)s")
 
 ROOT_DIR = "/home/xsuper"
+PROJECT_DIR = "Pytorch-UNet-master"
 BASE_DIR = Path(f"{ROOT_DIR}/unet_data/dataset_split/npzgood")
 LIST_DIR = Path(f"{ROOT_DIR}/unet_data/dataset_split/dataset_split")
 
@@ -339,7 +340,7 @@ def train_model(
 
     # 保存最优模型
     if best_model_state is not None and best_score >= 0.80:
-        save_dir = "good_model"
+        save_dir = "checkpoints"
         if not os.path.exists(save_dir):
             os.makedirs(save_dir)
 
@@ -347,7 +348,7 @@ def train_model(
         model.load_state_dict(best_model_state)
         model_name = (
             f"model_dice_{best_score:.4f},params_[{','.join(map(str, params))}]_"
-            f"{'attention' if use_attention else 'baseline'}.pth"
+            f"{'residual_attention' if use_attention else 'baseline'}.pth"
         )
         save_path = os.path.join(save_dir, model_name)
 
@@ -382,7 +383,7 @@ def train_model(
 
 # 测试模型（旧版）
 if __name__ == "__main__":
-    base_path = f"{ROOT_DIR}/Pytorch-UNet-master/good_model/"
+    base_path = f"{ROOT_DIR}/{PROJECT_DIR}/checkpoints/"
     saved_models = os.path.join(
         base_path,
         "model_dice_0.8881,params_[1,1,1,1,0,0,0,0,0,0,1,0,1,0,1,0,0,1,1,1,0,1,0,1].pth"

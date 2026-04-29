@@ -287,4 +287,4 @@ class AttentionBlock(nn.Module):
             psi = self.relu(torch.cat([g1, x1], dim=1))
 
         psi = self.psi(psi)
-        return x * psi
+        return x * (1 + psi)

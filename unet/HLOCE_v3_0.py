@@ -1,5 +1,5 @@
 """
-HLOCE_test_v3_0.py
+HLOCE_v3_0.py
 
 功能: 使用 HLOCE 对 U-Net 超参数调优
 时间: 2026/03/26
@@ -24,7 +24,10 @@ logging.basicConfig(level=logging.INFO, format="%(levelname)s: %(message)s")
 class HLOCEOptimizer:
     """HLOCE 参数和迭代类"""
 
-    def __init__(self, pop_size: int, bit: int, ne_ratio: float = 0.18):
+    def __init__(
+            self, pop_size: int, bit: int,
+            ne_ratio: float = 0.18
+    ):
         self.pop_size = pop_size
         self.bit = bit
         self.ne = int(self.pop_size * ne_ratio)
@@ -40,10 +43,10 @@ class HLOCEOptimizer:
         self.ps = np.zeros(pop_size)  # 决定交叉熵学习还是社会学习
 
         self.Kr, self.prMax = 2, 0.1                   # 计算 pr[i]
-        self.K1, self.Ki, self.piMax = 0.83, 5, 0.90   # 计算 pi[i]
-        self.K2, self.Ks, self.psMax = 0.24, 6, 0.32   # 计算 ps[i]
+        self.K1, self.Ki, self.piMax = 0.83, 4, 0.92   # 计算 pi[i]
+        self.K2, self.Ks, self.psMax = 0.82, 3, 0.87   # 计算 ps[i]
 
-        self.pr0, self.pi0, self.ps0 = 0.005, 0.80, 0.88  # sum 为 0 时的取值
+        self.pr0, self.pi0, self.ps0 = 0.005, 0.88, 0.50  # sum 为 0 时的取值
 
     def update_population(
             self, popus: np.ndarray, IKD: np.ndarray,
@@ -65,11 +68,11 @@ class HLOCEOptimizer:
             if total == 0:     # total 为 0 时，使用基本 HLO 的 pr 和 pi
                 self.pr[i] = self.pr0
                 self.pi[i] = self.pi0
-                # self.ps[i] = self.ps0
+                self.ps[i] = self.ps0
             else:              # total 不为 0 时，使用有效信息的计算方法
                 self.pr[i] = min(self.Kr / total, self.prMax)             # 控制 pr[i] 的上限
                 self.pi[i] = min(self.K1 + self.Ki / total, self.piMax)   # 控制 pi[i] 的上限
-                # self.ps[i] = min(self.K2 + self.Ks / total, self.psMax)   # 控制 ps[i] 的上限
+                self.ps[i] = min(self.K2 + self.Ks / total, self.psMax)   # 控制 ps[i] 的上限
 
             for j in range(self.bit):
                 prob1 = np.random.uniform()
@@ -79,7 +82,7 @@ class HLOCEOptimizer:
                 elif prob1 < self.pi[i]:    # 个体学习
                     popus[i][j] = IKD[i][j]
                 else:
-                    if prob2 < 0.64:  # 交叉熵学习
+                    if prob2 < self.ps[i]:  # 交叉熵学习
                         popus[i][j] = 1 if np.random.rand() < ber_params_after[j] else 0
                     else:                   # 社会学习
                         popus[i][j] = SKD[j]
@@ -250,8 +253,8 @@ def inject_elite(
 
 
 def HLOCE_v3_0(
-        max_iter: int = 20,
-        pop_size: int = 20,
+        max_iter: int = 40,
+        pop_size: int = 40,
         bit: int = 16,
         dim: int = 2,
         rl: int = 50,
@@ -291,7 +294,7 @@ def HLOCE_v3_0(
         "fitness": None,
     }
 
-    pop = inject_elite(pop, params_min, params_max)
+    # pop = inject_elite(pop, params_min, params_max)
 
     # 调用 testFunction，初始化适应度
     pop["fitness"] = testFunction(
